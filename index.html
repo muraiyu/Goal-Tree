@@ -1,0 +1,2309 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F5F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1719" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="目標ツリー">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>目標ツリー改訂版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 方眼ノートの上に、今日のノルマ → 目標ツリー → 課題 をタブで切り替える1カラムのアプリ */
+:root {
+  --bg: #F2F5F4; --grid: rgba(14,124,102,.06); --surface: #FFFFFF; --ink: #15212A; --muted: #5B6A72;
+  --line: #DAE2E0; --accent: #0E7C66; --accent-ink: #FFFFFF; --accent-soft: #DCF0EA;
+  --mark: #E9B726; --mark-soft: #FCF1CF; --warn: #C2410C; --warn-soft: #FCE6DA; --ok: #15803D; --ok-soft: #DCF3E3;
+  --s-mat: #00876A; --s-task: #5B6FD6; --s-asg: #B98500;
+  --tree-off: #BCC4C2; --tree-on: #2F9E55; --trunk-off: #A4AAA8; --trunk-on: #8A5A35;
+  --shadow: 0 1px 2px rgba(21,33,42,.06), 0 4px 14px rgba(21,33,42,.06);
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --tree-off: #4B5755; --tree-on: #45C46E; --trunk-off: #5C6563; --trunk-on: #A8764C;
+  --s-mat: #1E9C7D; --s-task: #7A88F2; --s-asg: #B48A22;
+  --bg: #0E1416; --grid: rgba(60,198,164,.05); --surface: #162024; --ink: #E5EEEC; --muted: #93A39F;
+  --line: #26353A; --accent: #3CC6A4; --accent-ink: #062018; --accent-soft: #123A31;
+  --mark: #E6BE52; --mark-soft: #382F1A; --warn: #F2925F; --warn-soft: #3B2418; --ok: #4ADE80; --ok-soft: #133524;
+  --shadow: 0 1px 2px rgba(0,0,0,.3); color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --tree-off: #4B5755; --tree-on: #45C46E; --trunk-off: #5C6563; --trunk-on: #A8764C;
+  --s-mat: #1E9C7D; --s-task: #7A88F2; --s-asg: #B48A22;
+  --bg: #0E1416; --grid: rgba(60,198,164,.05); --surface: #162024; --ink: #E5EEEC; --muted: #93A39F;
+  --line: #26353A; --accent: #3CC6A4; --accent-ink: #062018; --accent-soft: #123A31;
+  --mark: #E6BE52; --mark-soft: #382F1A; --warn: #F2925F; --warn-soft: #3B2418; --ok: #4ADE80; --ok-soft: #133524;
+  --shadow: 0 1px 2px rgba(0,0,0,.3); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+/* ロードマップ */
+.rm-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.rm { --labw: 158px; position: relative; }
+@media (min-width: 640px) { .rm { --labw: 210px; } }
+.rm-head, .rm-row { display: flex; height: 42px; }
+.rm-head { height: 40px; border-bottom: 1px solid var(--line); }
+.rm-row { border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.rm-row.root { border-top: 1px solid var(--line); }
+.rm-row.grp { height: 34px; border-top: 1px solid var(--line); }
+.rm-lab { position: sticky; left: 0; z-index: 3; flex: none; width: var(--labw); background: var(--surface); border-right: 1px solid var(--line); display: flex; align-items: center; gap: 4px; padding-right: 6px; min-width: 0; }
+.rm-lab { padding-left: 8px; }
+.rm-lab .ind { flex: none; }
+/* 名前の列では、行の区切り線のすき間から背景（休みの斜線など）が見えないように、線も自分で描く */
+.rm-row > .rm-lab { margin-bottom: -1px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, var(--surface)); }
+.rm-row.root > .rm-lab, .rm-row.grp > .rm-lab { margin-top: -1px; border-top: 1px solid var(--line); }
+.rm-lab.corner { padding-left: 10px; }
+.ic.task { color: var(--s-task); }
+.rm-lab .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; }
+.rm-lab.sub .t { font-weight: 500; }
+.rm-lab.done .t { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--muted); }
+.rm-row.grp .rm-lab { background: var(--bg); padding-left: 8px; }
+.rm-row.grp .t { cursor: default; color: var(--muted); }
+.rm-lab .tw { width: 22px; height: 22px; border: 0; background: transparent; padding: 0; display: grid; place-items: center; color: var(--muted); flex: none; }
+.rm-lab .tw svg { width: 15px; height: 15px; transition: transform .15s; }
+.rm-lab .tw.open svg { transform: rotate(90deg); }
+.rm-lab .ic { width: 22px; display: grid; place-items: center; flex: none; }
+.rm-lab .ic svg { width: 16px; height: 16px; }
+.ic.material { color: var(--s-mat); } .ic.asg { color: var(--s-asg); }
+.check.mini { width: 20px; height: 20px; border-radius: 6px; margin: 0 1px; }
+.check.mini svg { width: 12px; height: 12px; }
+.rm-track, .rm-scale { position: relative; flex: none; }
+.rm-body { position: relative; }
+.rm-grid { position: absolute; top: 0; bottom: 0; left: var(--labw); pointer-events: none; }
+.rm-grid i { position: absolute; top: 0; bottom: 0; }
+.rm-grid .mline { width: 1px; background: var(--line); }
+.rm-grid .wkend { background: color-mix(in srgb, var(--line) 35%, transparent); }
+.rm-grid .offr { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--warn) 14%, transparent) 0 5px, transparent 5px 11px); }
+.rm-grid .today { width: 2px; background: var(--ink); opacity: .75; }
+.rm-scale .mon { position: absolute; top: 3px; font-size: 12px; font-weight: 700; white-space: nowrap; padding-left: 5px; }
+.rm-scale .day { position: absolute; bottom: 3px; font-size: 10px; color: var(--muted); font-family: var(--font-num); transform: translateX(-50%); }
+.rm-scale .tdy { position: absolute; bottom: 2px; z-index: 1; font-size: 10.5px; font-weight: 700; background: var(--ink); color: var(--surface); border-radius: 4px; padding: 0 4px; transform: translateX(-50%); white-space: nowrap; }
+.rm-scale .offl { position: absolute; top: 3px; font-size: 10.5px; color: var(--warn); white-space: nowrap; margin-left: 40px; }
+.rm-bar { position: absolute; top: 14px; height: 14px; border-radius: 4px; overflow: hidden; cursor: pointer; border: 0; padding: 0; }
+.rm-bar > i { position: absolute; left: 0; top: 0; bottom: 0; display: block; }
+.rm-bar.mat { background: color-mix(in srgb, var(--s-mat) 22%, var(--surface)); }
+.rm-bar.mat > i { background: var(--s-mat); }
+.rm-bar.asg { background: color-mix(in srgb, var(--s-asg) 22%, var(--surface)); }
+.rm-bar.asg > i { background: var(--s-asg); }
+.rm-bar.done { opacity: .5; }
+.rm-line { position: absolute; top: 19px; height: 4px; border-radius: 2px; background: var(--line); }
+.rm-line > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--muted); border-radius: 2px; }
+.rm-dia { position: absolute; top: 14px; width: 13px; height: 13px; transform: translateX(-50%) rotate(45deg); border: 2px solid var(--ink); background: var(--surface); padding: 0; border-radius: 2px; cursor: pointer; z-index: 1; }
+.rm-dia.goal { background: var(--ink); }
+.rm-dia.task { border-color: var(--s-task); }
+.rm-dia.task.done { background: var(--s-task); }
+.rm-dia.shared { width: 9px; height: 9px; top: 16px; border-width: 1.5px; cursor: default; }
+.rm-tag { position: absolute; top: 12px; font-size: 11.5px; color: var(--muted); white-space: nowrap; pointer-events: none; font-family: var(--font-num); }
+.rm-legend i { display: inline-block; }
+.lg-bar { width: 16px; height: 8px; border-radius: 3px; }
+.lg-bar.mat { background: var(--s-mat); } .lg-bar.asg { background: var(--s-asg); }
+.lg-dia { width: 9px; height: 9px; transform: rotate(45deg); border: 2px solid var(--ink); border-radius: 1px; }
+.lg-dia.goal { background: var(--ink); } .lg-dia.task { border-color: var(--s-task); background: var(--s-task); }
+.lg-today { width: 2px; height: 12px; background: var(--ink); }
+.lg-off { width: 16px; height: 10px; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--warn) 35%, transparent) 0 3px, transparent 3px 6px); }
+.places { max-height: 230px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding-block: 4px; }
+.place { display: flex; align-items: center; gap: 8px; padding-block: 7px; padding-right: 10px; font-size: 14px; cursor: pointer; }
+.field .place input { width: 18px; height: 18px; min-height: 0; padding: 0; flex: none; accent-color: var(--accent); }
+.todos { display: flex; flex-direction: column; gap: 2px; }
+.todo { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.todo-t { overflow-wrap: anywhere; }
+.todo.done .todo-t { text-decoration: line-through; color: var(--muted); }
+.field .dclear { width: 34px; min-height: 42px; flex: none; font-size: 18px; color: var(--muted); }
+.field .row > input { min-width: 0; flex: 1; }
+.rm-lab .grip { width: 32px; min-height: 32px; flex: none; }
+.rm-lab .grip svg { width: 18px; height: 18px; }
+.rm.sorting .rm-row { transition: transform .18s ease; }
+.rm.sorting .rm-row.dragging { transition: none; position: relative; z-index: 4; box-shadow: 0 8px 24px rgba(8,14,16,.22); }
+.rm.dropping .rm-row { transition: none; }
+.selbox { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--accent); background: var(--surface); color: var(--accent-ink); display: grid; place-items: center; padding: 0; flex: none; cursor: pointer; }
+.selbox.on { background: var(--accent); }
+.selbox svg { width: 14px; height: 14px; }
+.rm-row.sel .rm-lab, .node.sel { background: var(--accent-soft); }
+.selbar { position: fixed; left: 0; right: 0; bottom: calc(62px + env(safe-area-inset-bottom, 0px)); z-index: 6; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(8,14,16,.10);
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 6px; }
+.app.selecting { padding-bottom: calc(200px + env(safe-area-inset-bottom, 0px)); }
+.subj-row { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.subj-row > * { flex: none; }
+textarea.mig { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 10px; font-family: var(--font-num); font-size: 12px; resize: vertical; }
+html, body { height: 100%; }
+body {
+  background-color: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+.app { max-width: 680px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px calc(96px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 20px; }
+/* 横画面や広い画面では幅を広く使う。ロードマップのタブは画面いっぱい */
+@media (orientation: landscape) { .app { max-width: 1100px; } }
+.app.wide { max-width: none; }
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.top h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: .02em; text-wrap: balance; }
+.top .sub { color: var(--muted); font-size: 13px; }
+.sync { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.sync.on i { background: var(--ok); }
+
+.section { display: flex; flex-direction: column; gap: 10px; }
+.section > h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.title { font-weight: 700; overflow-wrap: anywhere; }
+.crumb { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.day-h { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; padding-bottom: 2px; border-bottom: 1px solid var(--line); }
+.day-h b { color: var(--ink, inherit); }
+.day-h .num { margin-left: auto; font-weight: 700; color: var(--accent); }
+
+.bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .3s; }
+.bar.done > span { background: var(--ok); }
+
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.pill.mark { background: var(--mark-soft); color: var(--ink); }
+.pill.mark::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--mark); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.plain { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.danger { color: var(--warn); border-color: var(--warn); background: transparent; }
+.btn.danger.armed { background: var(--warn); color: var(--surface); }
+.btn.small { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.btn.icon { width: 36px; min-height: 36px; padding: 0; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+svg { width: 18px; height: 18px; flex: none; }
+
+/* 今日 */
+.hero { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+.ring { width: 72px; height: 72px; }
+.ring circle { fill: none; stroke-width: 7; }
+.ring .bg { stroke: var(--line); }
+.ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .4s; }
+.ring text { fill: var(--ink); font-family: var(--font-num); font-size: 17px; font-weight: 600; }
+.treemark { display: flex; flex-direction: column; align-items: center; gap: 0; width: 78px; }
+.treemark svg { width: 70px; height: 70px; }
+.treemark svg * { transition: fill .6s, stroke .6s; }
+.treemark .pctl { font-family: var(--font-num); font-weight: 600; font-size: 15px; line-height: 1.2; }
+.quota { display: flex; align-items: baseline; gap: 4px; }
+.quota b { font-family: var(--font-num); font-size: 26px; font-weight: 600; line-height: 1; }
+.quota .of { font-family: var(--font-num); color: var(--muted); }
+.mat.met { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.night { border: 1px solid var(--mark); background: var(--mark-soft); border-radius: var(--r); padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
+.night svg { color: var(--mark); margin-top: 2px; }
+
+.check { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; padding: 0; flex: none; }
+.check.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.check svg { width: 14px; height: 14px; }
+.task.done .title { text-decoration: line-through; color: var(--muted); }
+
+/* ツリー */
+.tree { display: flex; flex-direction: column; gap: 2px; }
+.node { display: grid; grid-template-columns: 24px 22px 1fr auto; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 10px; min-width: 0; }
+.node:hover { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); }
+.node .tw { width: 24px; height: 24px; border: 0; background: transparent; padding: 0; display: grid; place-items: center; color: var(--muted); }
+.node .tw svg { transition: transform .15s; }
+.node .tw.open svg { transform: rotate(90deg); }
+.node .ic { color: var(--accent); display: grid; place-items: center; }
+.node .ic.material { color: var(--mark); }
+.node .main { min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.node .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+.node .pct { font-family: var(--font-num); font-size: 12px; color: var(--muted); min-width: 3.2em; text-align: right; }
+.kids { border-left: 1.5px dashed var(--line); margin-left: 17px; padding-left: 4px; }
+.addbtn { width: 32px; min-height: 32px; color: var(--accent); }
+.node .meta .pill { white-space: normal; max-width: 100%; }
+.addbtn svg { width: 16px; height: 16px; }
+
+/* 課題 */
+.due { font-family: var(--font-num); font-weight: 600; font-size: 13px; text-align: center; min-width: 52px; padding: 6px 4px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); line-height: 1.2; }
+.due small { display: block; font-family: var(--font-body); font-weight: 500; font-size: 10.5px; }
+.due.soon { background: var(--warn-soft); color: var(--warn); }
+
+/* タブ */
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+.tabs .in { max-width: 680px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
+.tabs button { border: 0; background: transparent; padding: 8px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.tabs button svg { width: 22px; height: 22px; }
+.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; }
+
+/* シート */
+.scrim { position: fixed; inset: 0; background: rgba(8,14,16,.45); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 14px; }
+@media (min-width: 640px) { .scrim { align-items: center; } .sheet { border-radius: 18px; } }
+.sheet h3 { margin: 0; font-size: 18px; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field > span { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.field input, .field select, .field textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 11px; min-height: 42px; font-size: 16px; }
+.field textarea { min-height: 70px; resize: vertical; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; background: var(--bg); padding: 8px 4px; font-weight: 700; font-size: 13.5px; border-left: 1px solid var(--line); line-height: 1.3; }
+.seg button:first-child { border-left: 0; }
+.seg button small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button[aria-pressed="true"] small { color: inherit; }
+.dows { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dows button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 0; font-weight: 700; }
+.dows button[aria-pressed="true"] { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.hint { font-size: 12.5px; color: var(--muted); }
+input[type=range] { flex: 1; min-width: 0; min-height: 32px; accent-color: var(--accent); }
+.wout { font-size: 20px; min-width: 3.4em; text-align: right; }
+.btn.wout { font-size: 18px; border-style: dashed; }
+.field input.pnum { width: 5em; flex: none; text-align: right; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { border: 1px dashed var(--accent); background: transparent; color: var(--accent); border-radius: 99px; padding: 3px 10px; font-size: 12.5px; font-weight: 700; min-height: 32px; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-style: solid; }
+.dlrow input { min-width: 0; }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.grip { width: 40px; min-height: 40px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; border-radius: 8px; padding: 0; touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.grip svg { width: 22px; height: 22px; }
+.grip:active { cursor: grabbing; background: var(--accent-soft); color: var(--accent); }
+.tree.sorting .node, .tree.sorting .kids { transition: transform .18s ease; }
+.tree.sorting .node.dragging, .tree.sorting .kids.dragging { transition: none; position: relative; z-index: 3; background: var(--surface); }
+.node.dragging { box-shadow: 0 8px 24px rgba(8,14,16,.22); }
+.tree.dropping .node, .tree.dropping .kids { transition: none; }
+body.drag-on { -webkit-user-select: none; user-select: none; }
+.wk { display: flex; flex-direction: column; gap: 2px; }
+.wk-row { width: 100%; display: grid; grid-template-columns: 6.4em 1fr 5.8em; align-items: center; gap: 10px; border: 0; background: transparent; padding: 7px 4px; border-radius: 8px; text-align: left; }
+.wk-row:hover { background: var(--bg); }
+.wk-day { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.wk-track { display: flex; gap: 2px; height: 12px; min-width: 0; overflow: hidden; }
+.wk-seg { height: 100%; flex: none; }
+.wk-seg:last-child { border-radius: 0 4px 4px 0; }
+.wk-val { font-size: 13px; text-align: right; white-space: nowrap; }
+.wk-detail { margin: 2px 4px 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+.wk-grp { display: flex; flex-direction: column; gap: 3px; }
+.wk-gh { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.wk-gh i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.wk-gh .num { margin-left: auto; }
+.wk-it { display: flex; gap: 10px; padding-left: 16px; overflow-wrap: anywhere; }
+.wk-it .num { white-space: nowrap; }
+.s-mat { background: var(--s-mat); } .s-task { background: var(--s-task); } .s-asg { background: var(--s-asg); }
+.legend { display: flex; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-size: 11.5px; color: var(--muted); font-weight: 700; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.chg { background: var(--mark-soft); font-weight: 700; }
+td.off { color: var(--muted); }
+.log-in { display: inline-flex; align-items: center; gap: 4px; justify-content: flex-end; }
+tr.pick { cursor: pointer; }
+tr.pick.on td { background: var(--accent-soft, var(--bg)); font-weight: 700; }
+.logday input[type=date] { margin-top: 4px; padding: 4px 8px; min-height: 0; font-size: 14px; }
+input.log-cell { width: 74px; padding: 4px 8px; text-align: right; font-size: 16px; min-height: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.diff { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--bg); }
+
+.empty { text-align: center; padding: 26px 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.empty p { margin: 0; max-width: 34em; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(80px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 99px; font-size: 13.5px; z-index: 30; max-width: calc(100% - 32px); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* iPhoneの横画面など、高さが低いときは見出しを隠してボタンとタブを小さくし、表を広く見せる（ほかの指定より後に置く） */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app { padding-block: 8px calc(52px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
+  #view { gap: 10px !important; }
+  .top { display: none; }
+  .btn { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+  .seg button { padding: 5px 4px; font-size: 13px; }
+  .chip { min-height: 28px; padding: 2px 9px; }
+  .section { gap: 6px; }
+  .tabs button { flex-direction: row; justify-content: center; gap: 6px; padding: 6px 0; font-size: 12.5px; }
+  .tabs button svg { width: 18px; height: 18px; }
+  .selbar { bottom: calc(34px + env(safe-area-inset-bottom, 0px)); }
+}
+/* ホーム画面から全画面で開いたとき：画面上のノッチ・時計の下から始める */
+.app { padding-top: calc(20px + env(safe-area-inset-top, 0px)); }
+.login { max-width: 420px; margin: 8vh auto 0; }
+.login .err { color: var(--warn); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <div>
+      <div class="sub" id="today-label"></div>
+      <h1 id="view-title">今日</h1>
+    </div>
+    <span class="sync" id="sync"><i></i><span>読み込み中…</span></span>
+  </header>
+  <main id="view" class="stack" style="gap:20px"></main>
+</div>
+<nav class="tabs" aria-label="画面の切り替え"><div class="in" id="tabs"></div></nav>
+<div id="sheet-root"></div>
+
+<script>
+// ---------- アイコン ----------
+const ICONS = {
+  today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="m9 15 2 2 4-4"/></svg>',
+  tree: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2.2"/><circle cx="17" cy="12" r="2.2"/><circle cx="17" cy="19.5" r="2.2"/><path d="M6 7.2V17a2.5 2.5 0 0 0 2.5 2.5h6.3M6 12h8.8"/></svg>',
+  asg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
+  goal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+  material: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 2h13v-4"/><path d="M9 8h6"/></svg>',
+  task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
+  chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>',
+  grip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 8h14M5 12h14M5 16h14"/></svg>',
+  log: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+};
+function icon(name, cls) { const s = document.createElement('span'); s.className = cls || ''; s.style.display = 'inline-grid'; s.innerHTML = ICONS[name]; return s; }
+
+// ---------- DOM ヘルパー ----------
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'class') el.className = v;
+    else if (k === 'style') el.style.cssText = v;
+    else if (k === 'value') el.value = v;
+    else if (v === true) el.setAttribute(k, '');
+    else el.setAttribute(k, v);
+  }
+  for (const c of kids.flat(Infinity)) { if (c == null || c === false) continue; el.append(c.nodeType ? c : String(c)); }
+  return el;
+}
+let toastTimer;
+function toast(msg) {
+  document.querySelector('.toast')?.remove();
+  const t = h('div', { class: 'toast', role: 'status' }, msg); document.body.append(t);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2600);
+}
+
+// ---------- 日付 ----------
+const pad = n => String(n).padStart(2, '0');
+const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const today = () => fmt(new Date());
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return fmt(d); };
+const diffDays = (a, b) => Math.round((parse(b) - parse(a)) / 86400000);
+const dow = s => parse(s).getDay();
+const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+const md = s => { const d = parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
+const mdw = s => `${md(s)}（${DOW[dow(s)]}）`;
+
+// ---------- 状態と保存 ----------
+const state = { nodes: {}, asgs: {}, settings: { offRanges: [], nightHour: 21 }, ready: false };
+const asgProg = a => a.done ? 100 : Math.min(100, Math.max(0, Number(a.progress) || 0)); // 課題の達成度（%）
+const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+const store = {
+  mode: 'local', col: null, chains: {},
+  queue(id, fn) {
+    this.chains[id] = (this.chains[id] || Promise.resolve()).then(fn).catch(e => { console.error(e); toast('保存できませんでした。通信を確認してもう一度試してください'); });
+  },
+  put(doc) { // doc: { id, kind, ... }
+    const before = completeSet(); applyDoc(doc); markNewlyDone(before); render(); scheduleSplit();
+    const { id, ...body } = doc;
+    if (this.mode === 'sync') this.queue(id, () => this.col.doc(id).set(body)); else saveLocal();
+  },
+  patch(id, part) {
+    const cur = findDoc(id); if (!cur) return;
+    part = withWork(cur, part);
+    const before = completeSet(); applyDoc(deepMerge(structuredClone(cur), part)); markNewlyDone(before); render(); scheduleSplit();
+    if (this.mode === 'sync') this.queue(id, () => this.col.doc(id).update(part)); else saveLocal();
+  },
+  remove(id) {
+    delete state.nodes[id]; delete state.asgs[id]; render(); scheduleSplit();
+    if (this.mode === 'sync') this.queue(id, () => this.col.doc(id).delete()); else saveLocal();
+  },
+};
+// ---------- やったことの記録（タスク・目標・課題） ----------
+// その日に終えた・進めたものを worked[日付] に残す。次の日に progToday が上書きされても記録タブに残るように
+const isWorkItem = x => !!x && (x.kind === 'asg' || (x.kind === 'node' && (x.type === 'task' || x.type === 'goal')));
+const progOf = x => x.kind === 'asg' ? asgProg(x) : x.done ? 100 : x.type === 'task' && (x.items || []).length ? Math.round(x.items.filter(i => i.done).length / x.items.length * 100) : goalProg(x);
+// 保存した印がなくても、完了日（doneOn）や「その日の始めの達成度」（progToday）から分かる分は拾う（前からあるデータ用）
+function derivedWork(x, d) {
+  if (x.doneOn === d) return true;
+  const pt = x.progToday?.date === d ? x.progToday : null;
+  return !!pt && (!x.done || !x.doneOn) && progOf(x) > (Number(pt.from) || 0);
+}
+function workedOn(x, d) {
+  if (!isWorkItem(x)) return false;
+  if (x.workMin && x.workMin[d] != null) return true;
+  if (x.worked && d in x.worked) return !!x.worked[d];
+  return derivedWork(x, d);
+}
+// 見込み時間から出した、その日にかかった時間（自分で入れた時間があればそちらを使う）
+function workEst(x, d) {
+  const est = Number(x.estMin) || 0; if (!est) return 0;
+  if (x.kind === 'node' && x.type === 'goal' && kids(x.id).length && subtreeHasEst(x.id)) return 0; // 中の項目の方で数える
+  const pt = x.progToday?.date === d ? x.progToday : null, from = pt ? Number(pt.from) || 0 : 0;
+  const to = x.doneOn === d || (x.done && (pt || !x.doneOn)) ? 100 : pt ? progOf(x) : 0;
+  return Math.max(0, to - from) / 100 * est;
+}
+const workMinOf = (x, d) => x.workMin && x.workMin[d] != null ? Number(x.workMin[d]) || 0 : workEst(x, d);
+const workItems = d => [...Object.values(state.nodes), ...Object.values(state.asgs)].filter(x => workedOn(x, d));
+// 保存の前に：達成度が変わったら「今日の始めの達成度」を覚え、目標の完了日を入れ、今日の印をつけ外しする
+function withWork(cur, part) {
+  if (!isWorkItem(cur) || !('done' in part || 'progress' in part || 'items' in part)) return part;
+  const t = today(), out = { ...part }, before = progOf(cur);
+  let next = deepMerge(structuredClone(cur), part);
+  if (progOf(next) !== before && next.progToday?.date !== t) out.progToday = { date: t, from: before };
+  if (cur.kind === 'node' && cur.type === 'goal' && 'done' in part && !('doneOn' in part)) out.doneOn = part.done ? (cur.doneOn || t) : null;
+  next = deepMerge(structuredClone(cur), out);
+  const now = derivedWork(next, t), mark = cur.worked?.[t];
+  if (now && mark !== true) out.worked = { [t]: true }; else if (!now && mark === true) out.worked = { [t]: false };
+  return out;
+}
+
+// ---------- 見込み時間の等分 ----------
+// 「中のタスクに等分する」をオンにした目標は、見込み時間を中のタスク（直下）の数で割って、各タスクの見込み時間にする
+// 割り切れない分は前のタスクから1分ずつ足して、合計が目標の見込み時間と同じになるようにする
+const splitTasks = g => kids(g.id).filter(k => k.type === 'task');
+function splitShares(total, k) { const out = []; for (let i = 0; i < k; i++) out.push(Math.round(total * (i + 1) / k) - Math.round(total * i / k)); return out; }
+let splitQueued = false;
+function scheduleSplit() { if (splitQueued) return; splitQueued = true; queueMicrotask(() => { splitQueued = false; reconcileSplits(); }); }
+function reconcileSplits() {
+  for (const g of Object.values(state.nodes)) {
+    if (g.type !== 'goal' || !g.splitEst) continue;
+    const ts = splitTasks(g), sh = splitShares(Math.max(0, Number(g.estMin) || 0), ts.length);
+    ts.forEach((t, i) => { if ((Number(t.estMin) || 0) !== sh[i]) store.patch(t.id, { estMin: sh[i] }); });
+  }
+}
+
+// ---------- 完了したものの非表示 ----------
+// 完了：チェック済み、または100%（目標・教材）。課題は提出済み
+let showDone = false;
+try { showDone = localStorage.getItem('show-done') === '1'; } catch {}
+const keepVisible = new Set(); // この画面を見ている間に完了したもの。すぐには消さず、タブを移ると隠れる
+const isComplete = n => !!n && (n.done || progress(n.id) >= 0.9999);
+const hiddenDone = n => !showDone && isComplete(n) && !keepVisible.has(n.id);
+const completeSet = () => new Set([...Object.values(state.nodes).filter(isComplete).map(n => n.id), ...Object.values(state.asgs).filter(a => a.done).map(a => 'a:' + a.id)]);
+function markNewlyDone(before) {
+  for (const n of Object.values(state.nodes)) if (!before.has(n.id) && isComplete(n)) keepVisible.add(n.id);
+  for (const a of Object.values(state.asgs)) if (a.done && !before.has('a:' + a.id)) keepVisible.add('a:' + a.id);
+}
+function deepMerge(a, b) { for (const [k, v] of Object.entries(b)) { if (v && typeof v === 'object' && !Array.isArray(v) && a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) deepMerge(a[k], v); else a[k] = v; } return a; }
+function findDoc(id) { return state.nodes[id] || state.asgs[id] || (id === 'settings' ? { id, kind: 'settings', ...state.settings } : null); }
+function applyDoc(doc) {
+  if (doc.kind === 'node') state.nodes[doc.id] = doc;
+  else if (doc.kind === 'asg') state.asgs[doc.id] = doc;
+  else if (doc.kind === 'settings') { const { id, kind, ...s } = doc; state.settings = { offRanges: [], nightHour: 21, ...s }; }
+}
+function loadDocs(docs) { state.nodes = {}; state.asgs = {}; state.settings = { offRanges: [], nightHour: 21 }; docs.forEach(applyDoc); }
+const LS_KEY = 'goal-tree-v1';
+function saveLocal() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify([...Object.values(state.nodes), ...Object.values(state.asgs), { id: 'settings', kind: 'settings', ...state.settings }])); } catch {}
+}
+function loadLocal() { try { const raw = localStorage.getItem(LS_KEY); if (raw) loadDocs(JSON.parse(raw)); } catch {} }
+
+const FIREBASE_CONFIG = {
+  "apiKey": "AIzaSyDF91VPYO14h7pvYbXyhB6k2kEwacjFVVU",
+  "authDomain": "goal-tree-app-a6934.firebaseapp.com",
+  "projectId": "goal-tree-app-a6934",
+  "storageBucket": "goal-tree-app-a6934.firebasestorage.app",
+  "messagingSenderId": "742421850985",
+  "appId": "1:742421850985:web:2df7fb71afc22e394a2bf8"
+};
+let fb = null; // { auth, A: auth の関数, F: firestore の関数, db, user }
+async function initStore() {
+  const sync = document.getElementById('sync');
+  const setSync = (on, text) => { sync.className = 'sync' + (on ? ' on' : ''); sync.lastChild.textContent = text; };
+  let unsub = null;
+  try {
+    const [{ initializeApp }, A, F] = await Promise.all([import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'), import('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js'), import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')]);
+    const app = initializeApp(FIREBASE_CONFIG);
+    const auth = A.getAuth(app);
+    // オフラインでも開けるように、端末にもデータを残す
+    let db;
+    try { db = F.initializeFirestore(app, { ignoreUndefinedProperties: true, localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+    catch { db = F.initializeFirestore(app, { ignoreUndefinedProperties: true }); }
+    fb = { auth, A, F, db, user: null };
+    A.onAuthStateChanged(auth, user => {
+      if (unsub) { unsub(); unsub = null; }
+      fb.user = user;
+      if (!user) { store.mode = 'login'; state.needLogin = true; state.ready = false; setSync(false, 'ログインしていません'); render(); return; }
+      state.needLogin = false;
+      const ref = id => F.doc(db, 'users', user.uid, 'docs', id);
+      store.mode = 'sync';
+      store.col = { doc: id => ({ set: body => F.setDoc(ref(id), body), update: part => F.setDoc(ref(id), part, { merge: true }), delete: () => F.deleteDoc(ref(id)) }) };
+      // 通信の状態だけが変わったとき（オフライン→同期）は、表示の文字だけ変える
+      unsub = F.onSnapshot(F.collection(db, 'users', user.uid, 'docs'), { includeMetadataChanges: true }, snap => {
+        if (!state.ready || snap.docChanges().length) { loadDocs(snap.docs.map(d => ({ id: d.id, ...d.data() }))); state.ready = true; render(); }
+        setSync(!snap.metadata.fromCache, snap.metadata.fromCache ? 'オフライン（つながると同期）' : '同期オン');
+      }, err => { console.error(err); setSync(false, '同期が止まりました。開き直してください'); });
+    });
+  } catch (e) {
+    console.error(e);
+    loadLocal(); state.ready = true; render();
+    setSync(false, 'この端末だけに保存（同期につながりません）');
+  }
+}
+// ログイン画面（Firebase の Authentication で作ったアカウント）
+function loginView() {
+  const mail = h('input', { id: 'login-mail', type: 'email', autocomplete: 'username', inputmode: 'email', placeholder: 'メールアドレス' });
+  const pass = h('input', { id: 'login-pass', type: 'password', autocomplete: 'current-password', placeholder: 'パスワード' });
+  const err = h('p', { class: 'small err', style: 'margin:0', 'aria-live': 'polite' });
+  const btn = h('button', { class: 'btn primary', type: 'submit' }, 'ログイン');
+  const MSG = { 'auth/invalid-credential': 'メールアドレスかパスワードが違います', 'auth/invalid-email': 'メールアドレスの形が正しくありません', 'auth/too-many-requests': '何度も失敗したので、少し待ってからもう一度試してください', 'auth/network-request-failed': 'インターネットにつながっていません' };
+  const form = h('form', { class: 'card stack login', onsubmit: async e => {
+    e.preventDefault(); err.textContent = ''; btn.disabled = true;
+    try { await fb.A.signInWithEmailAndPassword(fb.auth, mail.value.trim(), pass.value); }
+    catch (x) { err.textContent = MSG[x.code] || 'ログインできませんでした（' + (x.code || x.message) + '）'; btn.disabled = false; }
+  } }, h('div', { class: 'title' }, 'ログイン'), h('p', { class: 'small muted', style: 'margin:0' }, '同じアカウントでログインすると、iPhone と iPad で同じデータが見られます。'),
+    field('メールアドレス', mail), field('パスワード', pass), err, h('div', { class: 'btns' }, btn));
+  return form;
+}
+
+// ---------- 木構造 ----------
+// 並び順：並べ替えたものは order（0,1,2…）、まだのものは作った時刻順で後ろに並ぶ
+const kids = id => Object.values(state.nodes).filter(n => (n.parent || null) === (id || null)).sort((a, b) => (a.order ?? a.created ?? 0) - (b.order ?? b.created ?? 0));
+function moveNode(n, dir) {
+  const sibs = kids(n.parent || null), i = sibs.findIndex(s => s.id === n.id), j = i + dir;
+  if (i < 0 || j < 0 || j >= sibs.length) return;
+  [sibs[i], sibs[j]] = [sibs[j], sibs[i]];
+  sibs.forEach((s, k) => { if (s.order !== k) store.patch(s.id, { order: k }); });
+}
+// ≡ をつかんで上下に動かし、離した位置へ並べ替える（同じ目標の中だけ）。
+// つかんだ項目が前後の項目の真ん中を越えると、その項目がつかんだ項目の高さぶんだけずれて空きを作る
+// リスト：ブロック = その行＋開いているときは下の階層ごと
+function startDrag(e, n) {
+  const pid = n.parent || '';
+  const blocks = [...document.querySelectorAll('.node')].filter(r => r.dataset.parent === pid).map(row => {
+    const k = row.nextElementSibling?.classList.contains('kids') ? row.nextElementSibling : null;
+    return makeBlock(row.dataset.id, k ? [row, k] : [row]);
+  });
+  const self = blocks.find(b => b.id === n.id);
+  runDrag(e, n, blocks, e.currentTarget.closest('.tree'), self ? parseFloat(getComputedStyle(self.els[0].parentElement).rowGap) || 0 : 0);
+}
+// ロードマップ：行が平らに並んでいるので、ブロック = その行＋すぐ後に続く深い行（開いている中身）
+function startDragRm(e, n) {
+  const pid = n.parent || '', rows = [...document.querySelectorAll('.rm-body > .rm-row[data-id]')], blocks = [];
+  rows.forEach((row, i) => {
+    if (row.dataset.parent !== pid) return;
+    const d = +row.dataset.depth, els = [row];
+    for (let j = i + 1; j < rows.length && +rows[j].dataset.depth > d; j++) els.push(rows[j]);
+    blocks.push(makeBlock(row.dataset.id, els));
+  });
+  runDrag(e, n, blocks, e.currentTarget.closest('.rm'), 0);
+}
+function makeBlock(id, els) {
+  const top = els[0].getBoundingClientRect().top + window.scrollY, bottom = els[els.length - 1].getBoundingClientRect().bottom + window.scrollY;
+  return { id, els, top, bottom, mid: (top + bottom) / 2 };
+}
+// 見えている兄弟の新しい順番を、隠れている兄弟（完了・絞り込み）の位置は変えずに全体の順番へ当てはめる
+function applyVisibleOrder(pid, vis) {
+  const set = new Set(vis); let i = 0;
+  kids(pid).map(k => (set.has(k.id) ? vis[i++] : k.id)).forEach((id, k) => { if (state.nodes[id].order !== k) store.patch(id, { order: k }); });
+}
+function runDrag(e, n, blocks, tree, gap) {
+  e.preventDefault();
+  const handle = e.currentTarget; handle.setPointerCapture?.(e.pointerId);
+  const si = blocks.findIndex(b => b.id === n.id); if (si < 0) return;
+  const self = blocks[si];
+  const H = self.bottom - self.top + gap;
+  const startY = e.clientY + window.scrollY;
+  tree.classList.add('sorting'); document.body.classList.add('drag-on');
+  self.els.forEach(el => el.classList.add('dragging'));
+  let target = si;
+  const move = ev => {
+    if (ev.clientY < 90) window.scrollBy(0, -10); else if (ev.clientY > window.innerHeight - 120) window.scrollBy(0, 10);
+    const dy = ev.clientY + window.scrollY - startY;
+    self.els.forEach(el => { el.style.transform = `translateY(${dy}px)`; });
+    const top = self.top + dy, bottom = self.bottom + dy;
+    let above = 0;
+    blocks.forEach((b, i) => {
+      if (i === si) return;
+      let shift = 0;
+      if (i < si && top < b.mid) shift = H;          // 上の項目を越えた → その項目は下へずれる
+      else if (i > si && bottom > b.mid) shift = -H; // 下の項目を越えた → その項目は上へずれる
+      b.els.forEach(el => { el.style.transform = shift ? `translateY(${shift}px)` : ''; });
+      if ((i < si && !shift) || (i > si && shift)) above++;
+    });
+    target = above;
+  };
+  const up = () => {
+    handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up);
+    tree.classList.add('dropping');
+    blocks.forEach(b => b.els.forEach(el => { el.style.transform = ''; el.classList.remove('dragging'); }));
+    tree.classList.remove('sorting', 'dropping'); document.body.classList.remove('drag-on');
+    if (target === si) return;
+    const vis = blocks.map(b => b.id).filter(id => id !== n.id); vis.splice(target, 0, n.id);
+    applyVisibleOrder(n.parent || null, vis);
+  };
+  handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
+}
+const path = id => { const out = []; let n = state.nodes[id]; while (n && n.parent) { n = state.nodes[n.parent]; if (n) out.unshift(n.title); } return out.join(' › '); };
+function descendants(id) { return kids(id).flatMap(k => [k.id, ...descendants(k.id)]); }
+const rootId = id => { let n = state.nodes[id]; while (n && n.parent && state.nodes[n.parent]) n = state.nodes[n.parent]; return n?.id; };
+
+// 共通の期限：大きな目標に deadlines を持たせ、下の項目は *Ref でその期限を指す
+const REF_FIELDS = [['deadlineRef', 'deadline'], ['endRef', 'end'], ['dateRef', 'date']];
+function sharedLabel(n, refField) {
+  if (!n[refField]) return null;
+  return state.nodes[rootId(n.id)]?.deadlines?.find(d => d.id === n[refField])?.label || null;
+}
+// 期限を入れたら、同じ大きな目標の「共通の期限」に自動で追加してつなぐ。同じ日付があればそれにつなぐ
+function shareDate(root, date, label) {
+  const list = root.deadlines || [], hit = list.find(d => d.date === date);
+  if (hit) return { ref: hit.id, list: null };
+  const d = { id: uid('dl'), label: String(label || '期限').slice(0, 20), date, auto: true };
+  return { ref: d.id, list: [...list, d] };
+}
+// doc は保存する前の目標・教材。大きな目標そのものなら doc.deadlines を書きかえ、それ以外は大きな目標を保存する
+function autoShare(doc, dateField, refField) {
+  if (!doc[dateField]) return doc;
+  const rid = doc.parent ? rootId(doc.parent) : doc.id, root = rid === doc.id ? doc : state.nodes[rid];
+  if (!root) return doc;
+  const linked = (root.deadlines || []).find(d => d.id === doc[refField]);
+  if (linked && linked.date === doc[dateField]) return doc; // すでに同じ日付の共通の期限につながっている
+  const { ref, list } = shareDate(root, doc[dateField], doc.title);
+  doc[refField] = ref;
+  if (list) { if (root === doc) doc.deadlines = list; else store.patch(root.id, { deadlines: list }); }
+  return doc;
+}
+// 自動で追加した共通の期限のうち、もうどこからも使われていないものを片付ける
+function pruneAutoDeadlines(rid) {
+  const root = state.nodes[rid];
+  if (!root || !(root.deadlines || []).some(d => d.auto)) return;
+  const used = new Set([root, ...descendants(rid).map(id => state.nodes[id])].flatMap(x => REF_FIELDS.map(([rf]) => x[rf]).filter(Boolean)));
+  const keep = root.deadlines.filter(d => !d.auto || used.has(d.id));
+  if (keep.length !== root.deadlines.length) store.patch(rid, { deadlines: keep });
+}
+// 自動追加の機能より前に入れた期限（読み込んだデータも）を、共通の期限にそろえる。追加・編集の画面を開くときに実行
+function ensureShared(rid) {
+  if (!rid || !state.nodes[rid]) return;
+  for (const id of [rid, ...descendants(rid)]) {
+    const x = state.nodes[id];
+    const pair = x?.type === 'goal' ? ['deadline', 'deadlineRef'] : x?.type === 'material' ? ['end', 'endRef'] : null;
+    if (!pair || !x[pair[0]]) continue;
+    if ((state.nodes[rid].deadlines || []).some(d => d.id === x[pair[1]] && d.date === x[pair[0]])) continue;
+    const tmp = autoShare({ ...x }, pair[0], pair[1]);
+    store.patch(id, id === rid ? { [pair[1]]: tmp[pair[1]], deadlines: tmp.deadlines } : { [pair[1]]: tmp[pair[1]] });
+  }
+}
+// 別の場所へのコピー（下の項目もいっしょに）。進み具合は0から、別の大きな目標なら共通の期限はその目標のものにつなぎ直す
+function copySubtree(src, parentId) {
+  if (!src) return;
+  const copy = { ...src, id: uid('n'), parent: parentId, order: Date.now(), created: Date.now(), done: false };
+  delete copy.doneOn; delete copy.progToday;
+  if (copy.type === 'material') { copy.log = {}; copy.initDone = 0; }
+  if (copy.type === 'goal') copy.progress = 0;
+  const sameRoot = parentId && rootId(parentId) === rootId(src.id);
+  if (!sameRoot) { for (const [rf] of REF_FIELDS) delete copy[rf]; if (parentId) delete copy.deadlines; }
+  if (copy.type === 'goal') autoShare(copy, 'deadline', 'deadlineRef');
+  else if (copy.type === 'material') autoShare(copy, 'end', 'endRef');
+  store.put(copy);
+  kids(src.id).forEach(k => copySubtree(k, copy.id));
+}
+function propagateDeadlines(root) {
+  const map = Object.fromEntries((root.deadlines || []).map(d => [d.id, d.date]));
+  for (const [rf, df] of REF_FIELDS) if (root[rf]) { if (map[root[rf]]) root[df] = map[root[rf]]; else root[rf] = null; }
+  for (const id of descendants(root.id)) {
+    const x = state.nodes[id], part = {};
+    for (const [rf, df] of REF_FIELDS) if (x[rf]) { if (!map[x[rf]]) part[rf] = null; else if (x[df] !== map[x[rf]]) part[df] = map[x[rf]]; }
+    if (Object.keys(part).length) store.patch(id, part);
+  }
+}
+function progress(id) {
+  const n = state.nodes[id]; if (!n) return 0;
+  if (n.done) return 1; // チェックしたものは、下の項目や記録にかかわらず100%
+  if (n.type === 'task') { const it = n.items || []; return it.length ? it.filter(i => i.done).length / it.length : goalProg(n) / 100; } // やることがあればチェックの割合、なければ入力した達成率
+  if (n.type === 'material') { const t = grand(n); return t ? Math.min(1, doneTotal(n) / t) : 0; }
+  const ks = kids(id); if (!ks.length) return goalProg(n) / 100; // 下に何もない目標は、入力した達成率
+  return ks.reduce((s, k) => s + progress(k.id), 0) / ks.length;
+}
+const doneTotal = m => (Number(m.initDone) || 0) + Object.values(m.log || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+// 周回：total は1周の量。全部で total × rounds を期間内に割り振る
+const roundsOf = m => Math.max(1, Math.floor(Number(m.rounds) || 1));
+const grand = m => (Number(m.total) || 0) * roundsOf(m);
+function lapInfo(m) {
+  const total = Number(m.total) || 0, rounds = roundsOf(m), done = doneTotal(m);
+  if (!total) return { lap: 1, inLap: done, total, rounds, finished: false };
+  if (done >= total * rounds) return { lap: rounds, inLap: total, total, rounds, finished: true };
+  const lap = Math.floor(done / total) + 1;
+  return { lap, inLap: done - (lap - 1) * total, total, rounds, finished: false };
+}
+const lapText = m => { const L = lapInfo(m), u = m.unit || ''; return (L.rounds > 1 ? `${L.lap}周目 ` : '') + `${L.inLap}/${L.total}${u}`; };
+
+// ---------- 自動振り分け ----------
+// 1日の重み：休みの日は0、課題の期間中は課題の重さで減らす（軽い0.75／普通0.5／重い0）
+function isOff(m, d) {
+  if ((m.skipDow || []).includes(dow(d))) return true;
+  return (state.settings.offRanges || []).some(r => d >= r.from && d <= r.to);
+}
+function plan(m, t = today()) {
+  const log = m.log || {};
+  let doneBefore = Number(m.initDone) || 0;
+  for (const [d, v] of Object.entries(log)) if (d < t) doneBefore += Number(v) || 0;
+  const doneToday = Number(log[t]) || 0;
+  const total = grand(m);
+  const R0 = m.done ? 0 : Math.max(0, total - doneBefore); // 完了にした教材はもう割り振らない
+  const from = t > m.start ? t : m.start;
+  const days = [];
+  for (let d = from; d <= m.end; d = addDays(d, 1)) {
+    const off = isOff(m, d);
+    days.push({ d, off, w: off ? 0 : 1 });
+  }
+  const W = days.reduce((s, x) => s + x.w, 0);
+  let cum = 0, prev = 0;
+  for (const x of days) { cum += x.w; const target = W ? Math.round(R0 * cum / W) : 0; x.q = target - prev; prev = target; }
+  const overdue = t > m.end && R0 > 0;
+  const todayQ = overdue ? R0 : (days[0] && days[0].d === t ? days[0].q : 0);
+  const workDays = days.filter(x => x.w > 0).length;
+  const notStarted = t < m.start;
+  const noDays = !overdue && R0 > 0 && W === 0;
+  return { R0, doneBefore, doneToday, days, todayQ, workDays, overdue, notStarted, noDays };
+}
+// ---------- 予測時間 ----------
+const fmtMin = m => `${Math.round(m)}分`; // 時間はすべて分で表示する
+const rateOf = m => (Number(m.totalMin) > 0 && Number(m.total) > 0) ? Number(m.totalMin) / Number(m.total) : 0; // 1単位あたりの分
+// 今日から7日分、教材（ノルマ×時間）・タスク・課題（取りかかる日〜〆切に均等割り）の予測時間
+function forecast(n = 7) {
+  const t = today(), out = [];
+  const mats = Object.values(state.nodes).filter(x => x.type === 'material' && rateOf(x) > 0).map(m => ({ m, pl: plan(m), r: rateOf(m) }));
+  for (let i = 0; i < n; i++) {
+    const d = addDays(t, i); let mat = 0, task = 0, asg = 0, left = 0;
+    const items = []; // 内訳：{ k: 'mat'|'task'|'asg', n: 項目, min, note }
+    for (const { m, pl, r } of mats) {
+      const q = i === 0 ? pl.todayQ : (pl.days.find(x => x.d === d) || {}).q || 0;
+      if (i === 0) left += Math.max(0, pl.todayQ - pl.doneToday) * r;
+      mat += q * r; if (q > 0) items.push({ k: 'mat', n: m, min: q * r, note: `${q}${m.unit || ''}` });
+    }
+    for (const x of Object.values(state.nodes)) {
+      if (x.type !== 'task' || !x.date || !(Number(x.estMin) > 0)) continue;
+      if (i === 0 ? ((x.date <= t && !x.done) || x.doneOn === t) : (x.date === d && !x.done)) { task += +x.estMin; if (!x.done) left += +x.estMin; items.push({ k: 'task', n: x, min: +x.estMin, note: x.done ? '済' : x.date < t ? `${md(x.date)}から` : '' }); }
+    }
+    for (const a of Object.values(state.asgs)) {
+      if (!(Number(a.estMin) > 0)) continue;
+      const pt = a.progToday?.date === t ? a.progToday : null;
+      if (a.done && !(i === 0 && pt)) continue;
+      const s = a.start > t ? a.start : t;
+      if (d < s || d > a.due) continue;
+      // 残りの時間（見込み × まだの割合）を、今日から〆切まで均等に割る。今日の分は「今日の始めの達成度」で固定する
+      const from = i === 0 && pt ? pt.from : asgProg(a);
+      const per = a.estMin * (1 - from / 100) / (diffDays(s, a.due) + 1);
+      asg += per; items.push({ k: 'asg', n: a, min: per, note: `〆${md(a.due)}` });
+      if (i === 0) left += Math.max(0, per - asgGainMin(a));
+    }
+    // 下に何もない目標：残りの時間を今日から期限まで均等に割る（期限が過ぎていたら今日に全部）
+    for (const g of Object.values(state.nodes)) {
+      // 中に項目がある目標の見込みは、中に見込み時間が1つもないときだけ使う（二重に数えない）
+      if (g.type !== 'goal' || !g.deadline || !(Number(g.estMin) > 0) || subtreeHasEst(g.id)) continue;
+      const pt = g.progToday?.date === t ? g.progToday : null;
+      if (g.done && !(i === 0 && pt)) continue;
+      const end = g.deadline < t ? t : g.deadline;
+      const gs = startOf(g), s0 = gs > t ? (gs > end ? end : gs) : t; // 開始日から割り振る
+      if (d < s0 || d > end) continue;
+      const from = i === 0 && pt ? pt.from : Math.round(progress(g.id) * 100);
+      const per = g.estMin * (1 - from / 100) / (diffDays(s0, end) + 1);
+      task += per; items.push({ k: 'task', n: g, min: per, note: `目標・期限${md(g.deadline)}` });
+      if (i === 0) left += Math.max(0, per - goalGainMin(g));
+    }
+    out.push({ d, mat, task, asg, total: mat + task + asg, left, items });
+  }
+  return out;
+}
+// 今日やった時間：教材（今日の記録 × 1単位の時間）＋ 今日終えたタスク ＋ 今日進めた課題の分
+const goalProg = g => g.done ? 100 : Math.min(100, Math.max(0, Number(g.progress) || 0));
+// 残り時間の見込み（分）：教材は残りの量 × 1単位の時間、タスクは未完了ならその時間、目標は下の合計（下がなければ見込み × まだの割合）
+function remainMin(n) {
+  if (!n || n.done) return 0;
+  if (n.type === 'material') return rateOf(n) * Math.max(0, grand(n) - doneTotal(n));
+  if (n.type === 'task') return (Number(n.estMin) || 0) * (1 - progress(n.id));
+  const ks = kids(n.id);
+  if (!ks.length) return (Number(n.estMin) || 0) * (1 - goalProg(n) / 100);
+  const sum = ks.reduce((s, k) => s + remainMin(k), 0);
+  return subtreeHasEst(n.id) ? sum : (Number(n.estMin) || 0) * (1 - progress(n.id)); // 中に見込みがなければ、自分の見込みを使う
+}
+// 中の項目のどれかに、時間の見込みが入っているか
+const subtreeHasEst = id => descendants(id).some(d => { const x = state.nodes[d]; return x && (Number(x.estMin) > 0 || (x.type === 'material' && Number(x.totalMin) > 0)); });
+const restTxt = n => { const m = remainMin(n); return m >= 1 ? `・残り${fmtMin(m)}` : ''; };
+function goalGainMin(g) {
+  const pt = g.progToday?.date === today() ? g.progToday : null;
+  return pt && Number(g.estMin) > 0 ? Math.max(0, goalProg(g) - pt.from) / 100 * g.estMin : 0;
+}
+// 目標の達成率を変えるときも、その日の最初の達成率を覚えておく
+function goalPatch(g, part) {
+  const t = today(), pt = g.progToday?.date === t ? g.progToday : { date: t, from: goalProg(g) };
+  store.patch(g.id, { ...part, progToday: pt });
+}
+function asgGainMin(a) {
+  const pt = a.progToday?.date === today() ? a.progToday : null;
+  return pt && Number(a.estMin) > 0 ? Math.max(0, asgProg(a) - pt.from) / 100 * a.estMin : 0;
+}
+function todayDoneMin() {
+  const t = today(); let min = 0;
+  for (const n of Object.values(state.nodes)) {
+    if (n.type === 'material') min += (Number((n.log || {})[t]) || 0) * rateOf(n);
+    else if (n.workMin && n.workMin[t] != null) min += Number(n.workMin[t]) || 0; // 記録タブで自分で入れた時間
+    else if (n.type === 'task' && n.done && n.doneOn === t) min += Number(n.estMin) || 0;
+    else if (n.type === 'task' && !n.done && !(n.items || []).length) min += goalGainMin(n); // 達成率を今日上げた分
+  }
+  for (const a of Object.values(state.asgs)) min += a.workMin && a.workMin[t] != null ? Number(a.workMin[t]) || 0 : asgGainMin(a);
+  for (const g of Object.values(state.nodes)) if (g.type === 'goal' && !(g.workMin && g.workMin[t] != null)) min += goalGainMin(g);
+  return min;
+}
+// 課題の達成度を変えるときは、その日の最初の達成度を覚えておく（今日進めた分を出すため）
+function asgPatch(a, part) {
+  const t = today(), pt = a.progToday?.date === t ? a.progToday : { date: t, from: asgProg(a) };
+  store.patch(a.id, { ...part, progToday: pt });
+}
+const SERIES = [['mat', '教材'], ['task', 'タスク・目標'], ['asg', '課題']];
+function weekCard(fc) {
+  const max = Math.max(...fc.map(x => x.total), 1), sum = fc.reduce((s, x) => s + x.total, 0);
+  const missing = Object.values(state.nodes).filter(x => x.type === 'material' && !rateOf(x) && doneTotal(x) < grand(x)).length;
+  const rows = fc.map((x, i) => {
+    // 内訳：種類ごとの合計の下に、項目ごとの時間（多い順）
+    const detail = h('div', { class: 'wk-detail', hidden: true }, x.total ? SERIES.filter(([k]) => x[k] > 0).map(([k, l]) => h('div', { class: 'wk-grp' },
+      h('div', { class: 'wk-gh small' }, h('i', { class: 's-' + k }), l, h('span', { class: 'num' }, fmtMin(x[k]))),
+      x.items.filter(it => it.k === k).sort((a, b) => b.min - a.min).map(it => h('div', { class: 'wk-it small' },
+        h('span', { class: 'grow' }, h('span', { class: 'muted' }, it.n.kind === 'asg' ? (it.n.subject ? it.n.subject + ' › ' : '') : (path(it.n.id) ? path(it.n.id).split(' › ').slice(-1)[0] + ' › ' : '')), it.n.title, it.note ? h('span', { class: 'muted' }, `（${it.note}）`) : null),
+        h('span', { class: 'num' }, fmtMin(it.min)))))) : h('div', { class: 'small muted' }, '予定なし'));
+    const btn = h('button', { class: 'wk-row', type: 'button', 'aria-expanded': 'false', onclick: () => { detail.hidden = !detail.hidden; btn.setAttribute('aria-expanded', String(!detail.hidden)); } },
+      h('span', { class: 'wk-day' }, i === 0 ? '今日' : i === 1 ? '明日' : mdw(x.d)),
+      h('span', { class: 'wk-track' }, SERIES.filter(([k]) => x[k] > 0).map(([k]) => h('span', { class: 'wk-seg s-' + k, style: `width:${x[k] / max * 100}%` }))),
+      h('span', { class: 'wk-val num' }, x.total ? fmtMin(x.total) : '—'));
+    return h('div', null, btn, detail);
+  });
+  return h('section', { class: 'section' }, h('h2', null, '7日間の予測時間'),
+    h('div', { class: 'card stack' },
+      h('div', { class: 'row', style: 'justify-content:space-between;flex-wrap:wrap' },
+        h('div', null, '合計 ', h('b', { class: 'num' }, fmtMin(sum)), h('span', { class: 'small muted' }, `（1日平均 ${fmtMin(sum / fc.length)}）`)),
+        h('div', { class: 'legend' }, SERIES.map(([k, l]) => h('span', null, h('i', { class: 's-' + k }), l)))),
+      h('div', { class: 'wk' }, rows),
+      h('p', { class: 'hint', style: 'margin:0' }, '日付をタップすると、教材・タスク・課題ごとの内訳が出ます。かかる時間を入れていないものは含まれません', missing ? `（時間が未設定の教材 ${missing}件）。` : '。')));
+}
+const activeMaterials = () => Object.values(state.nodes).filter(n => n.type === 'material' && !n.done && doneTotal(n) < grand(n));
+
+// ---------- 画面 ----------
+let tab = 'today';
+let sorting = false;
+let selecting = false; // まとめて選択するモード
+const selected = new Set();
+let visibleSel = []; // 今の画面に出ている項目（「すべて選ぶ」用）
+try { tab = localStorage.getItem('goal-tree-tab') || 'today'; } catch {}
+let expanded = new Set();
+try { expanded = new Set(JSON.parse(localStorage.getItem('goal-tree-open') || '[]')); } catch {}
+const saveOpen = () => { try { localStorage.setItem('goal-tree-open', JSON.stringify([...expanded])); } catch {} };
+const TABS = [['today', '今日'], ['tree', 'ロードマップ'], ['asg', '課題'], ['log', '記録'], ['settings', '設定']];
+
+function renderTabs() {
+  const el = document.getElementById('tabs'); el.replaceChildren();
+  for (const [k, label] of TABS) el.append(h('button', { 'aria-current': tab === k ? 'page' : null, onclick: () => { tab = k; rmScroll = null; keepVisible.clear(); selecting = false; selected.clear(); try { localStorage.setItem('goal-tree-tab', k); } catch {} render(); window.scrollTo(0, 0); } }, icon(k === 'today' ? 'today' : k), label));
+}
+function render() {
+  // 書き直すときに一瞬中身が空になり、ページが上に戻ってしまうのを防ぐ
+  const y = window.scrollY;
+  document.getElementById('app').classList.toggle('wide', tab === 'tree');
+  document.getElementById('app').classList.toggle('selecting', tab === 'tree' && selecting);
+  renderTabs();
+  document.getElementById('today-label').textContent = mdw(today());
+  document.getElementById('view-title').textContent = TABS.find(x => x[0] === tab)[1];
+  const v = document.getElementById('view'); v.replaceChildren();
+  if (state.needLogin) { v.append(loginView()); return; }
+  if (!state.ready) { v.append(h('div', { class: 'card muted' }, 'データを読み込んでいます…')); return; }
+  ({ today: viewToday, tree: viewGoals, asg: viewAsg, log: viewLog, settings: viewSettings })[tab](v);
+  if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+}
+
+function bar(p) { return h('div', { class: 'bar' + (p >= 1 ? ' done' : '') }, h('span', { style: `width:${Math.round(p * 100)}%` })); }
+// 今日の達成度の木：灰色の木の上に、色つきの木を下から達成度の高さぶんだけ重ねる（50%なら下半分だけ色つき）
+// 予測時間の120%から20%ごとに実が1つなる。種類は5種類の順番でくり返す
+const FRUITS = [
+  ['リンゴ', (x, y) => `<circle cx="${x}" cy="${y}" r="4.3" fill="#D8343C"/><path d="M${x} ${y - 4}v-2.2" stroke="#6B4423" stroke-width="1.2" stroke-linecap="round"/><ellipse cx="${x + 1.8}" cy="${y - 5.4}" rx="1.6" ry=".9" fill="#3E9B4F"/>`],
+  ['梨', (x, y) => `<circle cx="${x}" cy="${y + 1}" r="4" fill="#D6C64A"/><circle cx="${x}" cy="${y - 2.6}" r="2.7" fill="#D6C64A"/><path d="M${x} ${y - 5}v-1.8" stroke="#6B4423" stroke-width="1.2" stroke-linecap="round"/>`],
+  ['みかん', (x, y) => `<circle cx="${x}" cy="${y}" r="4.2" fill="#F28C1A"/><circle cx="${x}" cy="${y - 3.5}" r="1.2" fill="#3E9B4F"/>`],
+  ['もも', (x, y) => `<circle cx="${x}" cy="${y}" r="4.3" fill="#F5A0A6"/><path d="M${x} ${y - 4}q-1.6 4 0 8" stroke="#DD7380" stroke-width=".9" fill="none"/><ellipse cx="${x - 2.4}" cy="${y - 4.4}" rx="1.7" ry=".9" fill="#3E9B4F"/>`],
+  ['ぶどう', (x, y) => [[0, -2.6], [-2.2, 0], [2.2, 0], [-1.1, 2.4], [1.1, 2.4], [0, 4.6]].map(([dx, dy]) => `<circle cx="${x + dx}" cy="${y + dy - 1}" r="1.75" fill="#7A4BB5"/>`).join('') + `<path d="M${x} ${y - 4.4}v-1.6" stroke="#6B4423" stroke-width="1.1" stroke-linecap="round"/>`],
+];
+const FRUIT_SPOTS = [[28, 15], [46, 19], [17, 31], [55, 32], [36, 27], [25, 40], [47, 40], [37, 8], [11, 24], [61, 23], [36, 40], [20, 19]];
+const fruitCount = p => p >= 1.2 ? Math.floor((p - 1) / 0.2 + 1e-9) : 0;
+let treeSeq = 0;
+function treeMark(p) {
+  const pc = Math.round(p * 100), id = 'tree-clip-' + (++treeSeq);
+  const TOP = 4, BOTTOM = 70, fillH = (BOTTOM - TOP) * Math.min(1, Math.max(0, p));
+  const shape = (leaf, trunk) => `<path d="M36 67V38M36 52l-9-8M36 46l8-7" style="stroke:${trunk};fill:none" stroke-width="5" stroke-linecap="round"/>`
+    + `<g style="fill:${leaf}"><circle cx="36" cy="19" r="15"/><circle cx="21" cy="30" r="11.5"/><circle cx="51" cy="30" r="11.5"/><circle cx="36" cy="34" r="11"/></g>`;
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 72 72'); s.setAttribute('aria-hidden', 'true');
+  s.innerHTML = `<defs><clipPath id="${id}"><rect x="0" y="${BOTTOM - fillH}" width="72" height="${fillH}"/></clipPath></defs>`
+    + `<ellipse cx="36" cy="68" rx="16" ry="2.5" style="fill:var(--line)"/>`
+    + shape('var(--tree-off)', 'var(--trunk-off)')
+    + `<g clip-path="url(#${id})">${shape('var(--tree-on)', 'var(--trunk-on)')}</g>`
+    + Array.from({ length: Math.min(fruitCount(p), FRUIT_SPOTS.length) }, (_, i) => FRUITS[i % FRUITS.length][1](...FRUIT_SPOTS[i])).join('');
+  const nF = fruitCount(p), names = [...new Set(Array.from({ length: Math.min(nF, FRUITS.length) }, (_, i) => FRUITS[i][0]))];
+  return h('div', { class: 'treemark', role: 'img', 'aria-label': `今日の達成度 ${pc}%` + (nF ? `、実が${nF}個（${names.join('・')}）` : '') },
+    s, h('span', { class: 'pctl' }, pc + '%'));
+}
+function ring(p) {
+  const r = 30, c = 2 * Math.PI * r;
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 72 72'); s.setAttribute('class', 'ring');
+  s.innerHTML = `<circle class="bg" cx="36" cy="36" r="${r}"/><circle class="fg" cx="36" cy="36" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 36 36)"/><text x="36" y="42" text-anchor="middle">${Math.round(p * 100)}%</text>`;
+  return s;
+}
+
+// --- 今日 ---
+function viewToday(v) {
+  const t = today();
+  if (!Object.keys(state.nodes).length && !Object.keys(state.asgs).length) { v.append(emptyStart()); return; }
+  const mats = Object.values(state.nodes).filter(n => n.type === 'material').map(m => ({ m, p: plan(m) }))
+    .filter(x => (x.p.todayQ > 0 || x.p.doneToday > 0) && !x.p.notStarted);
+  const tasks = Object.values(state.nodes).filter(n => n.type === 'task' && n.date && ((n.date <= t && !n.done) || n.doneOn === t))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const units = mats.length + tasks.length;
+  const doneUnits = mats.filter(x => x.p.doneToday >= x.p.todayQ).length + tasks.filter(n => n.done).length;
+  const fc = forecast(), f0 = fc[0], doneMin = todayDoneMin();
+  // 予測時間があれば「やった時間 ÷ 予測時間」（100%を超えることもある）、なければ件数で
+  const p = f0.total > 0 ? doneMin / f0.total : (units ? doneUnits / units : 0);
+
+  const left = [...mats.filter(x => x.p.doneToday < x.p.todayQ).map(x => `${x.m.title} あと${x.p.todayQ - x.p.doneToday}${x.m.unit || ''}`), ...tasks.filter(n => !n.done).map(n => n.title)];
+  if (new Date().getHours() >= (Number(state.settings.nightHour) || 21) && left.length) {
+    v.append(h('div', { class: 'night', role: 'status' }, icon('moon'), h('div', { class: 'grow' }, h('div', { class: 'title' }, 'まだ残っています'), h('div', { class: 'small' }, left.join('、')))));
+  }
+
+  v.append(h('div', { class: 'card hero' }, treeMark(p), h('div', { class: 'stack', style: 'gap:2px' },
+    h('div', { class: 'title' }, units ? (doneUnits === units ? '今日のぶんは全部終わりました' : `今日やること ${units - doneUnits}件`) : '今日のノルマはありません'),
+    h('div', { class: 'small muted' }, `教材 ${mats.length}・タスク ${tasks.length}・達成 ${doneUnits}/${units}`),
+    f0.total ? h('div', { class: 'small' }, '予測 ', h('b', { class: 'num' }, fmtMin(f0.total)), '・やった ', h('b', { class: 'num' }, fmtMin(doneMin)), '・残り ', h('b', { class: 'num' }, fmtMin(f0.left))) : null,
+    f0.total ? h('div', { class: 'small muted' }, p >= 1 ? '予測時間の120%を超えると、20%ごとに実がなります' : '木の％は「やった時間 ÷ 予測時間」です') : null)));
+
+  const sm = h('section', { class: 'section' }, h('h2', null, '教材のノルマ'));
+  if (!mats.length) sm.append(h('div', { class: 'card small muted' }, '今日割り振られた教材はありません。「目標」タブで教材を追加すると、毎日の量が自動で決まります。'));
+  for (const { m, p: pl } of mats) sm.append(materialCard(m, pl));
+  v.append(sm);
+
+  // タスクは「今日の分」と「明日から1週間の分」に分けてまとめる。見出しに残りの件数と時間
+  const taskHead = (title, list) => {
+    const left = list.filter(n => !n.done), min = Math.round(left.reduce((s, n) => s + remainMin(n), 0));
+    return h('h2', null, title, list.length ? h('span', { style: 'letter-spacing:0;font-weight:500' }, `残り${left.length}件${min ? `・${fmtMin(min)}` : ''}`) : null);
+  };
+  const st = h('section', { class: 'section' }, taskHead('今日のタスク', tasks));
+  if (!tasks.length) st.append(h('div', { class: 'card small muted' }, '今日のタスクはありません。'));
+  else st.append(h('div', { class: 'card stack' }, tasks.map(taskRow)));
+  v.append(st);
+  const t7 = addDays(t, 6);
+  const week = Object.values(state.nodes).filter(n => n.type === 'task' && n.date && n.date > t && n.date <= t7)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.created || 0) - (b.created || 0));
+  const sw = h('section', { class: 'section' }, taskHead(`1週間のタスク（明日〜${md(t7)}）`, week));
+  if (!week.length) sw.append(h('div', { class: 'card small muted' }, '明日から1週間のタスクはありません。'));
+  else {
+    const box = h('div', { class: 'card stack' }); let day = '';
+    for (const n of week) {
+      if (n.date !== day) {
+        // 日付の横に、その日のタスクの合計時間（まだのものの残り時間）と件数
+        day = n.date; const ds = week.filter(x => x.date === day), left = ds.filter(x => !x.done), min = Math.round(left.reduce((s2, x) => s2 + remainMin(x), 0));
+        box.append(h('div', { class: 'crumb day-h' }, h('b', null, mdw(day) + (diffDays(t, day) === 1 ? '・明日' : '')),
+          h('span', { class: 'num' }, left.length ? `${left.length}件・${min ? fmtMin(min) : '時間なし'}` : '済み')));
+      }
+      box.append(taskRow(n));
+    }
+    sw.append(box);
+  }
+  v.append(sw);
+
+  if (fc.some(x => x.total)) v.append(weekCard(fc));
+
+  const upcoming = Object.values(state.asgs).filter(a => !a.done).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 3);
+  if (upcoming.length) {
+    v.append(h('section', { class: 'section' }, h('h2', null, '近い〆切', h('button', { class: 'btn ghost small', onclick: () => { tab = 'asg'; render(); } }, '課題をすべて見る')),
+      h('div', { class: 'stack' }, upcoming.map(asgCard))));
+  }
+}
+function materialCard(m, pl) {
+  const met = pl.doneToday >= pl.todayQ;
+  const pills = [];
+  const L = lapInfo(m);
+  if (L.rounds > 1) pills.push(h('span', { class: 'pill plain' }, `${L.lap}/${L.rounds}周目・${L.inLap}/${L.total}${m.unit || ''}`));
+  if (pl.overdue) pills.push(h('span', { class: 'pill warn' }, '期限を過ぎています'));
+  if (met) pills.push(h('span', { class: 'pill ok' }, '達成'));
+  const daysLeft = pl.workDays;
+  return h('div', { class: 'card stack mat' + (met ? ' met' : '') },
+    h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 'crumb' }, path(m.id)), h('div', { class: 'title' }, m.title)),
+      h('div', { class: 'quota' }, h('b', null, pl.doneToday), h('span', { class: 'of' }, `/ ${pl.todayQ}${m.unit || ''}`))),
+    bar(pl.todayQ ? Math.min(1, pl.doneToday / pl.todayQ) : 1),
+    pills.length ? h('div', { class: 'btns' }, pills) : null,
+    h('div', { class: 'row', style: 'flex-wrap:wrap;justify-content:flex-end' }, h('div', { class: 'grow small muted', style: 'flex-basis:14em' }, `残り ${Math.max(0, pl.R0 - pl.doneToday)}${m.unit || ''}・作業日あと${daysLeft}日（〜${md(m.end)}）${rateOf(m) && pl.todayQ ? `・今日 約${fmtMin(pl.todayQ * rateOf(m))}` : ''}`),
+      pl.doneToday > 0 ? (() => {
+        const b = deleteButton('リセット', () => { store.patch(m.id, { log: { [today()]: 0 } }); toast(`${m.title}：今日の記録を0に戻しました`); }, 'もう一度で0に');
+        b.classList.add('small'); b.title = '今日の記録を0に戻す'; return b;
+      })() : null,
+      h('button', { class: 'btn small', onclick: () => openLog(m) }, '記録'),
+      met ? null : h('button', { class: 'btn small primary', onclick: () => store.patch(m.id, { log: { [today()]: pl.todayQ } }) }, '達成')));
+}
+function taskRow(n) {
+  const t = today();
+  return h('div', { class: 'row task' + (n.done ? ' done' : '') },
+    h('button', { class: 'check' + (n.done ? ' on' : ''), 'aria-label': n.done ? '未完了に戻す' : '完了にする', onclick: () => store.patch(n.id, taskDonePatch(n, !n.done)) }, n.done ? icon('ok') : null),
+    h('div', { class: 'grow', role: 'button', tabindex: '0', style: 'cursor:pointer', onclick: () => openTaskSheet(n), onkeydown: e => { if (e.key === 'Enter') openTaskSheet(n); } },
+      h('div', { class: 'crumb' }, path(n.id)), h('div', { class: 'title' }, n.title)),
+    todoCount(n) ? h('span', { class: 'pill' }, todoCount(n)) : (goalProg(n) > 0 && !n.done ? h('span', { class: 'pill' }, goalProg(n) + '%') : null),
+    Number(n.estMin) > 0 ? h('span', { class: 'pill plain' }, fmtMin(n.estMin)) : null,
+    n.date < t && !n.done ? h('span', { class: 'pill warn' }, `${md(n.date)}から`) : null);
+}
+function emptyStart() {
+  return h('div', { class: 'card empty' },
+    h('div', { class: 'title', style: 'font-size:18px' }, '大きな目標から、今日やることまで'),
+    h('p', { class: 'muted' }, '目標を枝分かれさせて小さな目標に分け、教材を登録すると、毎日の量を自動で割り振ります。課題は〆切と達成度で管理できます。'),
+    h('div', { class: 'btns', style: 'justify-content:center' },
+      h('button', { class: 'btn primary', onclick: loadSample }, '例（TOEIC 800点）で試す'),
+      h('button', { class: 'btn', onclick: () => { tab = 'tree'; render(); openNode({ parent: null, type: 'goal' }); } }, '最初の目標を作る')));
+}
+
+// --- ロードマップ（横の時間軸） ---
+const ZOOMS = { m1: ['1か月', 26, 2], m3: ['3か月', 9, 7], y1: ['1年', 3, 14] }; // 1日の幅(px)・開いたとき今日より何日前を左端にするか
+let rmZoom = 'm3', goalView = 'map', rmScroll = null;
+try { rmZoom = localStorage.getItem('rm-zoom') || 'm3'; goalView = localStorage.getItem('rm-view') || 'map'; } catch {}
+if (!ZOOMS[rmZoom]) rmZoom = 'm3';
+// 科目：大きな目標のすぐ下の目標（例：中間試験 → 電気回路）。同じ名前は別の試験でもまとめて表示する
+let rmSubject = '';
+try { rmSubject = localStorage.getItem('rm-subject') || ''; } catch {}
+const normS = s => String(s || '').replace(/\s/g, '');
+const sameSubject = (a, b) => { a = normS(a); b = normS(b); return !!a && !!b && (a.includes(b) || b.includes(a)); };
+function subjectList() {
+  const out = [];
+  kids(null).forEach(r => kids(r.id).forEach(k => { if (k.type === 'goal' && !out.some(s => normS(s) === normS(k.title))) out.push(k.title); }));
+  Object.values(state.asgs).forEach(a => { if (a.subject && !out.some(s => sameSubject(s, a.subject))) out.push(a.subject); });
+  return out;
+}
+
+function viewGoals(v) {
+  // 完了したものの数（上の目標ごと隠れるものは1件と数える）
+  const doneCount = Object.values(state.nodes).filter(n => isComplete(n) && !isComplete(state.nodes[n.parent])).length
+    + Object.values(state.asgs).filter(a => a.done && diffDays(a.due, today()) <= 60).length;
+  v.append(h('div', { class: 'btns', style: 'align-items:center' },
+    h('div', { class: 'seg', role: 'group', 'aria-label': '表示の切り替え', style: 'min-width:220px;flex:1;max-width:320px' },
+      [['map', 'ロードマップ'], ['list', 'リスト']].map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(goalView === k),
+        onclick: () => { goalView = k; try { localStorage.setItem('rm-view', k); } catch {} render(); } }, l))),
+    doneCount || showDone ? h('button', { class: 'btn small', type: 'button', 'aria-pressed': String(showDone),
+      onclick: () => { showDone = !showDone; keepVisible.clear(); try { localStorage.setItem('show-done', showDone ? '1' : '0'); } catch {} render(); } },
+      icon('ok'), showDone ? '完了したものを隠す' : `完了したもの（${doneCount}）を表示`) : null,
+    h('button', { class: 'btn small', type: 'button', 'aria-pressed': String(selecting),
+      onclick: () => { selecting = !selecting; selected.clear(); sorting = false; render(); } }, selecting ? '選択を終わる' : '選択')));
+  visibleSel = [];
+  (goalView === 'map' ? viewRoadmap : viewTree)(v);
+  if (selecting) v.append(selBar());
+}
+// 項目の期間：教材は開始〜終了、タスクはやる日、目標は下の項目全部の期間〜期限
+// 目標の開始日：入れていればその日、入れていなければ作った日（新しく作るときは今日）
+const startOf = g => g.start || (g.created ? fmt(new Date(g.created)) : today());
+function spanOf(n) {
+  if (!n) return null;
+  if (n.type === 'material') return n.start && n.end ? { from: n.start, to: n.end } : null;
+  if (n.type === 'task') return n.date ? { from: n.date, to: n.date } : null;
+  const ds = kids(n.id).map(spanOf).filter(Boolean);
+  // 開始日を入れていればその日から。なければ下の項目のいちばん早い日（何もなければ作った日）
+  let from = startOf(n);
+  const to = n.deadline || (ds.length ? ds.reduce((m, s) => s.to > m ? s.to : m, ds[0].to) : null) || n.start || null;
+  if (!to) return null;
+  if (from > to) from = to;
+  return { from, to };
+}
+function viewRoadmap(v) {
+  const t = today(), roots = kids(null), subjects = subjectList();
+  if (rmSubject && !subjects.some(s => normS(s) === normS(rmSubject))) rmSubject = '';
+  const subj = rmSubject;
+  const asgs = Object.values(state.asgs)
+    .filter(a => (!a.done || ((showDone || keepVisible.has('a:' + a.id)) && diffDays(a.due, t) <= 60)) && (!subj || sameSubject(a.subject, subj) || normS(a.title).includes(normS(subj))))
+    .sort((a, b) => a.due.localeCompare(b.due));
+  v.append(h('div', { class: 'btns', style: 'align-items:center' },
+    h('button', { class: 'btn primary', onclick: () => openNode({ parent: null, type: 'goal' }) }, icon('plus'), '大きな目標を追加'),
+    h('button', { class: 'btn', type: 'button', 'aria-pressed': String(sorting), onclick: () => { sorting = !sorting; selecting = false; selected.clear(); render(); } }, sorting ? '並べ替えを終わる' : '並べ替え'),
+    h('div', { class: 'grow' }),
+    h('div', { class: 'seg', role: 'group', 'aria-label': '表示する期間の幅', style: 'min-width:210px' },
+      Object.entries(ZOOMS).map(([k, [l]]) => h('button', { type: 'button', 'aria-pressed': String(rmZoom === k),
+        onclick: () => { rmZoom = k; rmScroll = null; try { localStorage.setItem('rm-zoom', k); } catch {} render(); } }, l)))));
+  if (!roots.length && !asgs.length) { v.append(emptyStart()); return; }
+
+  // 科目を選んだときは、その科目の目標だけを全部開いて表示（上に大きな目標を見出しとして置く）
+  const rows = [];
+  const walk = (n, depth, forced) => { if (hiddenDone(n)) return; rows.push({ n, depth, forced }); if (n.type === 'goal' && (forced || expanded.has(n.id))) kids(n.id).forEach(k => walk(k, depth + 1, forced)); };
+  if (!subj) roots.forEach(r => walk(r, 0, false));
+  else roots.forEach(r => {
+    const hit = kids(r.id).filter(k => k.type === 'goal' && normS(k.title) === normS(subj));
+    if (!hit.length || hiddenDone(r)) return;
+    rows.push({ n: r, depth: 0, forced: true }); // 見出しの大きな目標だけ固定。科目から下はトグルで開け閉めできる
+    hit.forEach(k => walk(k, 1, false));
+  });
+  if (subjects.length) v.append(h('div', { class: 'subj-row', role: 'group', 'aria-label': '科目で絞り込む' },
+    h('span', { class: 'hint' }, '科目：'),
+    ['', ...subjects].map(s => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(normS(s) === normS(subj)),
+      onclick: () => {
+        rmSubject = s; rmScroll = null; try { localStorage.setItem('rm-subject', s); } catch {}
+        // 選んだ科目は、中が1段見えるように開いておく（その下は閉じたまま）
+        if (s) { kids(null).forEach(r => kids(r.id).forEach(k => { if (k.type === 'goal' && normS(k.title) === normS(s)) expanded.add(k.id); })); saveOpen(); }
+        render();
+      } }, s || 'すべて'))));
+  if (!rows.length && !asgs.length) { v.append(h('div', { class: 'card small muted' }, subj ? `「${subj}」の予定はありません。` : '表示する予定はありません。', showDone ? '' : '完了したものは「完了したものを表示」で見られます。')); return; }
+
+  // 表示する範囲：全部の項目が入るように。左端は月初め
+  let lo = addDays(t, -7), hi = addDays(t, 60);
+  const take = s => { if (!s) return; if (s.from < lo) lo = s.from; if (s.to > hi) hi = s.to; };
+  rows.forEach(r => take(spanOf(r.n)));
+  asgs.forEach(a => take({ from: a.start, to: a.due }));
+  roots.forEach(r => (r.deadlines || []).forEach(d => d.date && take({ from: d.date, to: d.date })));
+  lo = addDays(lo, -3).slice(0, 8) + '01'; hi = addDays(hi, 14);
+  const px = ZOOMS[rmZoom][1], W = (diffDays(lo, hi) + 1) * px;
+  const X = d => diffDays(lo, d) * px, mid = d => X(d) + px / 2;
+  const span = (a, b) => Math.max(4, (diffDays(a, b) + 1) * px);
+
+  // 目盛りと背景（月の線・土日・休みの期間・今日の線）
+  const scale = h('div', { class: 'rm-scale', style: `width:${W}px` });
+  const grid = h('div', { class: 'rm-grid', style: `width:${W}px` });
+  for (let d = lo; d <= hi; d = addDays(d, 1)) {
+    const dd = parse(d), day = dd.getDate(), wd = dd.getDay();
+    if (day === 1) {
+      scale.append(h('span', { class: 'mon', style: `left:${X(d)}px` }, `${dd.getMonth() + 1}月` + (dd.getMonth() === 0 || d === lo ? ` ${dd.getFullYear()}` : '')));
+      grid.append(h('i', { class: 'mline', style: `left:${X(d)}px` }));
+    }
+    if (px >= 20 && (wd === 0 || wd === 6)) grid.append(h('i', { class: 'wkend', style: `left:${X(d)}px;width:${px}px` }));
+    const showDay = px >= 20 ? true : px >= 9 ? wd === 1 : false;
+    if (showDay && Math.abs(diffDays(d, t)) > (px >= 20 ? 0 : 3)) scale.append(h('span', { class: 'day', style: `left:${mid(d)}px` }, day));
+  }
+  (state.settings.offRanges || []).forEach(r => {
+    if (r.to < lo || r.from > hi) return;
+    const f = r.from < lo ? lo : r.from;
+    grid.append(h('i', { class: 'offr', style: `left:${X(f)}px;width:${span(f, r.to)}px` }));
+    if (px >= 9) scale.append(h('span', { class: 'offl', style: `left:${X(f) + 2}px` }, r.label || '休み'));
+  });
+  grid.append(h('i', { class: 'today', style: `left:${mid(t) - 1}px` }));
+  scale.append(h('span', { class: 'tdy', style: `left:${mid(t)}px` }, '今日'));
+
+  const tag = (x, text) => h('span', { class: 'rm-tag', style: `left:${x}px` }, text);
+  // チェックは左端にそろえ、階層の字下げはその右側に入れる
+  const label = (n, depth, text, onclick, lead, check) => h('div', { class: 'rm-lab' + (depth ? ' sub' : '') + (n && n.done ? ' done' : '') },
+    check, h('span', { class: 'ind', style: `width:${Math.min(depth, 3) * 9}px` }), lead, h('button', { type: 'button', class: 't', title: text, onclick }, text),
+    // 並べ替え中は名前の右に ≡（つかんで上下に動かす）
+    sorting && n && n.kind === 'node' ? h('button', { class: 'grip', type: 'button', 'aria-label': `${text}を並べ替え（ドラッグ、または上下キー）`,
+      onpointerdown: e => startDragRm(e, n), onkeydown: e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); moveNode(n, e.key === 'ArrowUp' ? -1 : 1); } } }, icon('grip')) : null);
+  const body = h('div', { class: 'rm-body' }, grid);
+
+  for (const { n, depth, forced } of rows) {
+    const s = spanOf(n), pc = Math.round(progress(n.id) * 100);
+    const track = h('div', { class: 'rm-track', style: `width:${W}px` });
+    let lead = null;
+    const check = selecting ? selBox(n) : nodeCheck(n);
+    visibleSel.push(n.id);
+    if (n.type === 'goal') {
+      const open = forced || expanded.has(n.id), hasKids = kids(n.id).some(k => !hiddenDone(k));
+      lead = [hasKids && !forced ? h('button', { type: 'button', class: 'tw' + (open ? ' open' : ''), 'aria-label': open ? '閉じる' : '開く', 'aria-expanded': String(open),
+        onclick: () => { open ? expanded.delete(n.id) : expanded.add(n.id); saveOpen(); render(); } }, icon('chev')) : h('span', { class: 'tw' })];
+      if (s) track.append(h('div', { class: 'rm-line', style: `left:${X(s.from)}px;width:${span(s.from, s.to)}px` }, h('i', { style: `width:${pc}%` })));
+      if (!n.parent) (n.deadlines || []).filter(d => d.date && d.id !== n.deadlineRef && d.date >= lo && d.date <= hi)
+        .forEach(d => track.append(h('i', { class: 'rm-dia shared', style: `left:${mid(d.date)}px`, title: `${d.label || '期限'} ${md(d.date)}` })));
+      if (n.deadline) {
+        track.append(h('button', { type: 'button', class: 'rm-dia goal', style: `left:${mid(n.deadline)}px`, 'aria-label': `${n.title}の期限 ${md(n.deadline)}`, onclick: () => openGoalActions(n) }));
+        track.append(tag(mid(n.deadline) + 12, `${md(n.deadline)}・${pc}%${restTxt(n)}`));
+      } else if (s) track.append(tag(X(s.to) + px + 6, `${pc}%${restTxt(n)}`));
+      else track.append(tag(mid(t) + 8, '日付なし'));
+    } else if (n.type === 'material') {
+      lead = icon('material', 'ic material');
+      if (s) {
+        track.append(h('button', { type: 'button', class: 'rm-bar mat' + (n.done ? ' done' : ''), style: `left:${X(s.from)}px;width:${span(s.from, s.to)}px`,
+          'aria-label': `${n.title} ${md(s.from)}〜${md(s.to)} ${pc}%`, onclick: () => openLog(n) }, h('i', { style: `width:${pc}%` })));
+        const L = lapInfo(n);
+        track.append(tag(X(s.to) + px + 6, `${pc}%` + (L.rounds > 1 ? `・${L.lap}周目` : '') + restTxt(n)));
+      }
+    } else {
+      lead = icon('task', 'ic task');
+      if (s) {
+        track.append(h('button', { type: 'button', class: 'rm-dia task' + (n.done ? ' done' : ''), style: `left:${mid(n.date)}px`, 'aria-label': `${n.title} ${md(n.date)}`, onclick: () => openTaskSheet(n) }));
+        const tpc = Math.round(progress(n.id) * 100);
+        track.append(tag(mid(n.date) + 12, md(n.date) + (todoCount(n) ? `・${todoCount(n)}` : tpc > 0 && tpc < 100 ? `・${tpc}%` : '') + restTxt(n)));
+      } else track.append(tag(mid(t) + 8, '日付なし'));
+    }
+    const onLabel = selecting ? () => toggleSel(n.id) : n.type === 'goal' ? () => openGoalActions(n) : n.type === 'material' ? () => openLog(n) : () => openTaskSheet(n);
+    body.append(h('div', { class: 'rm-row' + (depth ? '' : ' root') + (selected.has(n.id) ? ' sel' : ''), 'data-id': n.id, 'data-parent': n.parent || '', 'data-depth': depth }, label(n, depth, n.title, onLabel, lead, check), track));
+  }
+
+  if (asgs.length) {
+    body.append(h('div', { class: 'rm-row grp' }, h('div', { class: 'rm-lab' }, icon('asg', 'ic asg'), h('span', { class: 't' }, '課題')), h('div', { class: 'rm-track', style: `width:${W}px` })));
+    for (const a of asgs) {
+      const pr = asgProg(a), track = h('div', { class: 'rm-track', style: `width:${W}px` });
+      track.append(h('button', { type: 'button', class: 'rm-bar asg' + (a.done ? ' done' : ''), style: `left:${X(a.start)}px;width:${span(a.start, a.due)}px`,
+        'aria-label': `${a.title} ${md(a.start)}〜${md(a.due)} ${pr}%`, onclick: () => openAsg(a) }, h('i', { style: `width:${pr}%` })));
+      track.append(tag(X(a.due) + px + 6, a.done ? '提出済み' : `〆${md(a.due)}・${pr}%`));
+      body.append(h('div', { class: 'rm-row' }, label(a, 1, a.title, () => openAsg(a), icon('asg', 'ic asg'), checkMini(a, () => { asgPatch(a, { done: !a.done }); if (!a.done) toast('提出済みにしました'); })), track));
+    }
+  }
+
+  const wrap = h('div', { class: 'rm-wrap', onscroll: e => { rmScroll = e.target.scrollLeft; } },
+    h('div', { class: 'rm', style: `width:calc(var(--labw) + ${W + 110}px)` },
+      h('div', { class: 'rm-head' }, h('div', { class: 'rm-lab corner' }, h('span', { class: 'small muted' }, '項目')), scale), body));
+  v.append(wrap,
+    h('div', { class: 'legend rm-legend' },
+      h('span', null, h('i', { class: 'lg-bar mat' }), '教材'), h('span', null, h('i', { class: 'lg-bar asg' }), '課題'),
+      h('span', null, h('i', { class: 'lg-dia task' }), 'タスク'), h('span', null, h('i', { class: 'lg-dia goal' }), '目標の期限'),
+      h('span', null, h('i', { class: 'lg-today' }), '今日'), (state.settings.offRanges || []).length ? h('span', null, h('i', { class: 'lg-off' }), '休みの期間') : null),
+    h('p', { class: 'hint', style: 'margin:0' }, '横にスクロールできます。バーの濃い部分が進んだところです。名前やバーをタップすると、記録・編集・下に追加ができます。「並べ替え」を押すと、名前の右の ≡ をつかんで順番を入れ替えられます。'));
+  requestAnimationFrame(() => {
+    wrap.scrollLeft = rmScroll ?? Math.max(0, X(addDays(t, -ZOOMS[rmZoom][2]))); // 開いたときは今日の少し前が左端にくる位置
+    const row = document.querySelector('.subj-row'), on = row?.querySelector('.chip[aria-pressed="true"]');
+    if (row && on) { const a = row.getBoundingClientRect(), c = on.getBoundingClientRect(); row.scrollLeft += (c.left + c.width / 2) - (a.left + a.width / 2); }
+  });
+}
+// 項目欄のチェック。完了しても行は消えず、名前に取り消し線が入る
+const checkMini = (x, onclick) => h('button', { type: 'button', class: 'check mini' + (x.done ? ' on' : ''),
+  'aria-label': x.done ? `${x.title}を未完了に戻す` : `${x.title}を完了にする`, onclick }, x.done ? icon('ok') : null);
+function nodeCheck(n) {
+  return checkMini(n, () => {
+    if (n.type === 'goal') goalPatch(n, { done: !n.done });
+    else store.patch(n.id, n.type === 'task' ? taskDonePatch(n, !n.done) : { done: !n.done });
+    if (!n.done && n.type === 'material') toast('教材を完了にしました。毎日のノルマから外れます');
+  });
+}
+// ---------- タスクのやること（チェックリスト） ----------
+const todoCount = n => { const it = n.items || []; return it.length ? `${it.filter(i => i.done).length}/${it.length}` : ''; };
+// タスクごと完了／未完了にするときは、やることもまとめてそろえる
+const taskDonePatch = (n, done) => ({ done, doneOn: done ? today() : null, ...((n.items || []).length ? { items: n.items.map(i => ({ ...i, done })) } : {}) });
+// やることを書き換える。全部チェックするとタスクも完了
+function setItems(t, items) {
+  const done = items.length ? items.every(i => i.done) : !!t.done;
+  store.patch(t.id, { items, done, doneOn: done ? (t.doneOn || today()) : null });
+}
+function openTaskSheet(n) {
+  openSheet(n.title, (close) => {
+    const cur = () => state.nodes[n.id] || n;
+    const countEl = h('b', { class: 'num' }), barEl = bar(0), list = h('div', { class: 'todos' });
+    const showBar = pc => { barEl.firstChild.style.width = pc + '%'; barEl.classList.toggle('done', pc >= 100); };
+    // やることがないときだけ、達成率を直接入れる欄を出す
+    const progBox = taskProgressControl(n, v => { countEl.textContent = v + '%'; showBar(v); });
+    const draw = () => {
+      const t = cur(), items = t.items || [], p = progress(t.id);
+      countEl.textContent = items.length ? `${items.filter(i => i.done).length} / ${items.length}` : Math.round(p * 100) + '%';
+      showBar(Math.round(p * 100));
+      progBox.hidden = items.length > 0;
+      list.replaceChildren(...items.map(it => h('div', { class: 'row todo' + (it.done ? ' done' : '') },
+        h('button', { class: 'check mini' + (it.done ? ' on' : ''), type: 'button', 'aria-label': it.done ? `${it.text}を未完了に戻す` : `${it.text}を完了にする`,
+          onclick: () => { setItems(cur(), (cur().items || []).map(x => x.id === it.id ? { ...x, done: !x.done } : x)); draw(); } }, it.done ? icon('ok') : null),
+        h('span', { class: 'grow todo-t' }, it.text),
+        h('button', { class: 'btn icon ghost small', type: 'button', 'aria-label': `${it.text}を削除`, onclick: () => { setItems(cur(), (cur().items || []).filter(x => x.id !== it.id)); draw(); } }, '×'))));
+    };
+    const inp = h('input', { id: 'todo-new', placeholder: '例：問1', enterkeyhint: 'enter', onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); } } });
+    const add = () => {
+      const text = inp.value.trim(); if (!text) return;
+      const t = cur(); setItems(t, [...(t.items || []), { id: uid('i'), text, done: false }]);
+      inp.value = ''; inp.focus(); draw();
+    };
+    draw();
+    const t0 = cur();
+    return [
+      h('div', { class: 'crumb' }, path(n.id)),
+      h('div', { class: 'diff small' }, h('div', null, '進み具合：', countEl), barEl,
+        t0.date ? h('div', { class: 'muted' }, `やる日 ${mdw(t0.date)}${Number(t0.estMin) > 0 ? `・${fmtMin(t0.estMin)}` : ''}`) : null),
+      progBox,
+      list,
+      h('div', { class: 'row', style: 'align-items:flex-end' }, h('label', { class: 'field grow' }, h('span', null, 'やることを追加'), inp),
+        h('button', { class: 'btn primary', type: 'button', onclick: add }, icon('plus'), '追加')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'やることを入れると、達成率はチェックした割合になります。全部チェックすると、タスクも完了になります。'),
+      h('button', { class: 'btn', type: 'button', onclick: () => { close(); openNode(cur()); } }, icon('edit'), 'タスクを編集'),
+      convertRow(cur(), close),
+    ];
+  });
+}
+// ---------- 小さい目標 ⇔ タスク ⇔ 教材 の入れ替え ----------
+// 日付・時間の見込み・達成率は引き継ぐ（目標の期限＝タスクのやる日＝教材の終了日）。
+// タスクの「やること」は、目標にするとそれぞれ中のタスクに、教材にすると「こ」の数になる。
+// 中に項目がある目標と大きな目標は変えられない
+const TYPE_NAME = { goal: '小さい目標', task: 'タスク', material: '教材' };
+function convertNode(n, to, after, quiet) { // quiet：まとめて変えるときはお知らせを出さず、変えられたかを返す
+  n = state.nodes[n.id] || n;
+  if (n.type === to) return;
+  if (n.type === 'goal' && !n.parent) { if (!quiet) toast('大きな目標は種類を変えられません'); return false; }
+  if (n.type === 'goal' && kids(n.id).length) { if (!quiet) toast('中に項目がある目標は種類を変えられません。先に中身を移すか削除してください'); return false; }
+  const p = Math.round(progress(n.id) * 100), done = !!n.done || p >= 100;
+  const from = n.type === 'material' ? n.start : n.type === 'goal' ? startOf(n) : (n.date || today());
+  const end = n.type === 'material' ? n.end : n.type === 'goal' ? n.deadline : n.date;
+  const ref = n.type === 'material' ? n.endRef : n.type === 'goal' ? n.deadlineRef : n.dateRef;
+  const est = n.type === 'material' ? (Number(n.totalMin) || 0) * roundsOf(n) : Number(n.estMin) || 0;
+  const its = n.type === 'task' ? (n.items || []) : [];
+  const base = { id: n.id, kind: 'node', parent: n.parent, title: n.title, created: n.created || Date.now(), ...(n.order != null ? { order: n.order } : {}), done };
+  let doc;
+  if (to === 'goal') doc = { ...base, type: 'goal', start: from || null, deadline: end || null, deadlineRef: ref || null, progress: its.length ? 0 : p, estMin: its.length ? 0 : est };
+  else if (to === 'task') doc = { ...base, type: 'task', date: end || null, dateRef: ref || null, items: [], progress: p, estMin: est, doneOn: done ? today() : null };
+  else {
+    const s = from || today(), e = end && end >= s ? end : addDays(s, 6);
+    doc = { ...base, type: 'material', unit: its.length ? 'こ' : '%', total: its.length || 100, initDone: its.length ? its.filter(i => i.done).length : p,
+      log: {}, start: s, end: e, endRef: end && end >= s ? (ref || null) : null, skipDow: [], totalMin: est, rounds: 1 };
+  }
+  if (to === 'goal') autoShare(doc, 'deadline', 'deadlineRef');
+  if (to === 'material') autoShare(doc, 'end', 'endRef');
+  store.put(doc);
+  if (to === 'goal' && its.length) {
+    its.forEach((it, i) => store.put({ id: uid('n'), kind: 'node', type: 'task', parent: n.id, title: it.text, date: null, done: !!it.done, doneOn: it.done ? today() : null, estMin: 0, items: [], created: Date.now() + i, order: i }));
+    expanded.add(n.id); saveOpen();
+  }
+  if (!quiet) toast(`${TYPE_NAME[to]}に変えました` + (to === 'goal' && its.length ? `（やること${its.length}つを中のタスクにしました）` : to === 'material' ? '。全体の量を確かめてください' : ''));
+  after?.(to);
+  return true;
+}
+// 種類を変えるボタン（自分以外の2つ）。before は変える前に呼ぶ（編集中の内容を保存するため）。
+// 変えたあと：教材になったら量を確かめられるよう編集画面を、reopen なら新しい種類の編集画面を開く
+function convertRow(n, close, reopen, before) {
+  if (!['goal', 'task', 'material'].includes(n.type) || (n.type === 'goal' && !n.parent)) return null;
+  return h('div', { class: 'field' }, h('span', null, '種類を変える'),
+    h('div', { class: 'btns' }, ['goal', 'task', 'material'].filter(t => t !== n.type).map(t => h('button', { class: 'btn small', type: 'button',
+      onclick: () => { before?.(); convertNode(n, t, to => { close(); const m = state.nodes[n.id]; if (m && (reopen || to === 'material')) openNode(m); }); } },
+      icon(t), TYPE_NAME[t] + 'に'))));
+}
+// タスクの達成率（やることがないとき）。±10%・1%刻みのバー・数字のどれでも変えられ、手を止めて少したったら保存
+function taskProgressControl(n, onChange) {
+  let val = goalProg(state.nodes[n.id] || n), timer = null;
+  const range = h('input', { id: 't-prog', type: 'range', min: '0', max: '100', step: '1', value: val, 'aria-label': '達成率', oninput: e => setP(e.target.value) });
+  const num = h('input', { id: 't-prog-num', class: 'pnum', type: 'number', inputmode: 'numeric', min: '0', max: '100', step: '1', value: val, 'aria-label': '達成率（%）',
+    oninput: e => { if (e.target.value !== '') setP(e.target.value); }, onblur: () => { num.value = val; } });
+  const minus = h('button', { class: 'btn small', type: 'button', 'aria-label': '達成率を10%下げる', onclick: () => setP(val - 10) }, '−10%');
+  const plus = h('button', { class: 'btn small primary', type: 'button', 'aria-label': '達成率を10%上げる', onclick: () => setP(val + 10) }, '+10%');
+  const setP = v => {
+    val = Math.min(100, Math.max(0, Math.round(Number(v) || 0)));
+    range.value = val; if (document.activeElement !== num) num.value = val;
+    minus.disabled = val <= 0; plus.disabled = val >= 100; onChange?.(val);
+    clearTimeout(timer);
+    timer = setTimeout(() => { const cur = state.nodes[n.id]; if (cur && goalProg(cur) !== val) goalPatch(cur, { progress: val, done: val >= 100, doneOn: val >= 100 ? today() : null }); }, 400);
+  };
+  minus.disabled = val <= 0; plus.disabled = val >= 100;
+  return h('div', { class: 'field' }, h('span', null, '達成率（バーは1%刻み・数字も入力できます）'),
+    h('div', { class: 'row' }, minus, range, plus), h('div', { class: 'row', style: 'gap:6px' }, num, h('span', null, '%')));
+}
+// ---------- まとめて選択・まとめて操作 ----------
+const toggleSel = id => { selected.has(id) ? selected.delete(id) : selected.add(id); render(); };
+const selBox = n => h('button', { class: 'selbox' + (selected.has(n.id) ? ' on' : ''), type: 'button', 'aria-pressed': String(selected.has(n.id)),
+  'aria-label': `${n.title}を選ぶ`, onclick: () => toggleSel(n.id) }, selected.has(n.id) ? icon('ok') : null);
+// 選んだものの中で、上の目標も選ばれているものは除く（移動・削除は上の目標ごとまとめて扱う）
+const topSelected = () => [...selected].filter(id => { if (!state.nodes[id]) return false; let p = state.nodes[id].parent; while (p) { if (selected.has(p)) return false; p = state.nodes[p]?.parent; } return true; });
+function selBar() {
+  const n = [...selected].filter(id => state.nodes[id]).length, dis = !n;
+  const act = (label, fn, cls) => h('button', { class: 'btn small' + (cls ? ' ' + cls : ''), type: 'button', disabled: dis, onclick: fn }, label);
+  let del = act('削除');
+  if (!dis) { del = deleteButton('削除', bulkDelete, `もう一度押すと${n}件を削除`); del.classList.add('small'); }
+  return h('div', { class: 'selbar', role: 'toolbar', 'aria-label': 'まとめて操作' },
+    h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, h('b', null, `${n}件を選択中`), selTimeTxt(), h('span', { class: 'grow' }),
+      h('button', { class: 'btn small ghost', type: 'button', onclick: () => { visibleSel.forEach(id => selected.add(id)); render(); } }, 'すべて選ぶ'),
+      // 選んだ目標の中身（11-1〜11-4など）をまとめて選び、目標そのものは外す。中が閉じていれば開く
+      h('button', { class: 'btn small ghost', type: 'button', disabled: ![...selected].some(id => kids(id).length), onclick: () => {
+        for (const id of [...selected]) { if (!kids(id).length) continue; selected.delete(id); expanded.add(id); kids(id).forEach(k => { if (!hiddenDone(k)) selected.add(k.id); }); }
+        saveOpen(); render();
+      } }, '中を選ぶ'),
+      h('button', { class: 'btn small ghost', type: 'button', disabled: dis, onclick: () => { selected.clear(); render(); } }, '選択を外す')),
+    h('div', { class: 'btns' }, act('完了にする', () => bulkDone(true), 'primary'), act('未完了に戻す', () => bulkDone(false)),
+      act('種類を変える', openBulkType), act('移動', openBulkMove), act('日付', openBulkDate), act('時間', openBulkTime), del));
+}
+// 選んだものの時間：見込みの合計と残り（中身ごと選んだときに二重に数えないよう、いちばん上のものだけ足す）
+function selTime() {
+  let est = 0, rest = 0;
+  for (const id of topSelected()) {
+    const n = state.nodes[id];
+    est += estOf(n);
+    rest += remainMin(n);
+  }
+  return { est, rest };
+}
+// 見込み時間の合計（教材は1周の時間×周回数。目標は中に見込みがあれば中の合計、なければ自分の見込み）
+const estOf = n => n.type === 'material' ? (Number(n.totalMin) || 0) * roundsOf(n) : n.type === 'goal' && subtreeHasEst(n.id) ? kids(n.id).reduce((s, k) => s + estOf(k), 0) : Number(n.estMin) || 0;
+const selTimeTxt = () => { if (!selected.size) return null; const { est, rest } = selTime(); return h('span', { class: 'small muted num' }, est || rest ? `見込み ${fmtMin(est)}・残り ${fmtMin(rest)}` : '時間の見込みなし'); };
+// 見込み時間をまとめて入れる。目標・タスクは「見込み時間」、教材は「1周の時間」
+function openBulkTime() {
+  const ids = [...selected].filter(id => state.nodes[id]);
+  openSheet('かかる時間をまとめて入れる', (close) => {
+    let mode = 'each';
+    const min = h('input', { id: 'bulk-min', type: 'number', inputmode: 'numeric', min: '0', step: '5', placeholder: '例：30' });
+    const prev = h('p', { class: 'hint', style: 'margin:0' });
+    const upd = () => { const v = Math.max(0, Number(min.value) || 0), k = ids.length;
+      prev.textContent = !min.value ? '空のまま決めると、見込み時間をなしに戻します。' : mode === 'each' ? `${k}件それぞれを ${fmtMin(v)} にします（合計 ${fmtMin(v * k)}）。` : `合計 ${fmtMin(v)} を ${k}件で分けて、1件 ${fmtMin(v / k)} にします。`; };
+    min.addEventListener('input', upd);
+    const seg = h('div', { class: 'seg', role: 'group', 'aria-label': '入れ方', style: 'flex-shrink:0' },
+      [['each', '1件ずつこの時間'], ['split', '合計を等分']].map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(mode === k), onclick: e => {
+        mode = k; e.currentTarget.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); upd(); } }, l)));
+    upd();
+    return [
+      h('p', { class: 'hint', style: 'margin:0' }, `${ids.length}件を選んでいます。目標とタスクは「見込み時間」、教材は「1周の時間」になります。`),
+      seg, field('時間（分）', min), prev,
+      h('div', { class: 'btns' }, h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        const v = Math.max(0, Number(min.value) || 0), per = Math.round(mode === 'each' ? v : v / ids.length);
+        for (const id of ids) { const n = state.nodes[id]; if (!n) continue; store.patch(id, n.type === 'material' ? { totalMin: per } : { estMin: per }); }
+        close(); toast(min.value ? `${ids.length}件を ${fmtMin(per)} にしました` : `${ids.length}件の見込み時間をなしにしました`);
+      } }, 'この時間にする')),
+    ];
+  });
+}
+function bulkDone(done) {
+  let c = 0;
+  for (const id of selected) {
+    const n = state.nodes[id]; if (!n) continue;
+    if (n.type === 'task') store.patch(id, taskDonePatch(n, done)); else if (n.type === 'goal') goalPatch(n, { done }); else store.patch(id, { done });
+    c++;
+  }
+  toast(`${c}件を${done ? '完了にしました' : '未完了に戻しました'}`);
+}
+function bulkDelete() {
+  const ids = topSelected(); let c = 0;
+  ids.forEach(id => { [...descendants(id), id].forEach(x => { store.remove(x); c++; }); });
+  selected.clear(); render(); toast(`${c}件を削除しました`);
+}
+function openBulkType() {
+  openSheet('種類をまとめて変える', (close) => [
+    h('p', { class: 'hint', style: 'margin:0' }, `選んだ${selected.size}件を変えます。大きな目標と、中に項目がある目標は変えられません。`),
+    h('div', { class: 'stack', style: 'gap:8px' }, ['goal', 'task', 'material'].map(t => h('button', { class: 'btn', type: 'button', onclick: () => {
+      let ok = 0, ng = 0;
+      for (const id of [...selected]) { const n = state.nodes[id]; if (!n || n.type === t) continue; convertNode(n, t, null, true) ? ok++ : ng++; }
+      close(); toast(`${ok}件を${TYPE_NAME[t]}に変えました` + (ng ? `（${ng}件は変えられませんでした）` : '') + (t === 'material' && ok ? '。全体の量を確かめてください' : ''));
+    } }, icon(t), TYPE_NAME[t] + 'にする'))),
+  ]);
+}
+// 移す先は目標だけ。選んだものとその中には移せない
+function moveNodeTo(n, pid) {
+  if (n.type !== 'goal' && !pid) return false;
+  if (pid && (pid === n.id || descendants(n.id).includes(pid))) return false;
+  if ((n.parent || null) === pid) return true;
+  const part = { parent: pid, order: Date.now() };
+  if (rootId(n.id) !== (pid ? rootId(pid) : n.id)) { // 別の大きな目標へ移したら、共通の期限との連動は外す
+    for (const [rf] of REF_FIELDS) part[rf] = null;
+    descendants(n.id).forEach(d => { const x = state.nodes[d], p2 = {}; for (const [rf] of REF_FIELDS) if (x[rf]) p2[rf] = null; if (Object.keys(p2).length) store.patch(d, p2); });
+  }
+  store.patch(n.id, part);
+  return true;
+}
+function openBulkMove() {
+  const ids = topSelected(), banned = new Set(ids.flatMap(id => [id, ...descendants(id)]));
+  const opts = [['', 'いちばん上（大きな目標にする）', 0]];
+  const walkOpts = (pid, depth) => kids(pid).forEach(k => { if (k.type !== 'goal' || banned.has(k.id)) return; opts.push([k.id, k.title, depth]); walkOpts(k.id, depth + 1); });
+  walkOpts(null, 0);
+  openSheet('まとめて移動', (close) => [
+    h('p', { class: 'hint', style: 'margin:0' }, `選んだ${ids.length}件を、どの目標の中へ移しますか。いちばん上には目標だけ移せます。`),
+    h('div', { class: 'places' }, opts.map(([id, label, depth]) => h('button', { class: 'place', type: 'button', style: `padding-left:${10 + Math.min(depth, 4) * 14}px;border:0;background:transparent;width:100%;text-align:left`,
+      onclick: () => {
+        let ok = 0, ng = 0;
+        ids.forEach(x => (moveNodeTo(state.nodes[x], id || null) ? ok++ : ng++));
+        if (id) expanded.add(id); saveOpen(); close();
+        toast(`${ok}件を「${id ? state.nodes[id].title : 'いちばん上'}」へ移しました` + (ng ? `（${ng}件は移せませんでした）` : ''));
+      } }, icon(id ? 'goal' : 'tree'), label))),
+  ]);
+}
+// 日付：目標は期限、タスクはやる日、教材は終了日。共通の期限にも自動で追加してつなぐ
+function openBulkDate() {
+  openSheet('日付をまとめて変える', (close) => {
+    const d = h('input', { id: 'bulk-date', type: 'date', value: today() });
+    return [
+      h('p', { class: 'hint', style: 'margin:0' }, '目標は期限、タスクはやる日、教材は終了日になります。×で未設定にできます（教材は未設定にできません）。'),
+      field('日付', dateClear(d)),
+      h('div', { class: 'btns' }, h('button', { class: 'btn primary', type: 'button', onclick: () => { const r = bulkDate(d.value || null); close(); toast(`${r.ok}件の日付を変えました` + (r.ng ? `（${r.ng}件は変えられませんでした）` : '')); } }, 'この日付にする')),
+    ];
+  });
+}
+function bulkDate(v) {
+  let ok = 0, ng = 0; const roots = new Set();
+  for (const id of [...selected]) {
+    const n = state.nodes[id]; if (!n) continue;
+    if (n.type === 'goal') {
+      const doc = autoShare({ ...n, deadline: v, deadlineRef: null }, 'deadline', 'deadlineRef');
+      store.patch(id, { deadline: v, deadlineRef: v ? doc.deadlineRef || null : null, ...(doc.deadlines && doc.deadlines !== n.deadlines ? { deadlines: doc.deadlines } : {}) });
+    } else if (n.type === 'task') store.patch(id, { date: v, dateRef: null });
+    else if (n.type === 'material') {
+      if (!v) { ng++; continue; }
+      const doc = autoShare({ ...n, end: v, endRef: null }, 'end', 'endRef');
+      store.patch(id, { end: v, endRef: doc.endRef || null, ...(n.start > v ? { start: v } : {}) });
+    } else continue;
+    ok++; roots.add(rootId(id));
+  }
+  roots.forEach(pruneAutoDeadlines);
+  return { ok, ng };
+}
+function openGoalActions(n) {
+  ensureShared(rootId(n.id));
+  openSheet(n.title, (close) => {
+    const go = f => () => { close(); f(); };
+    const pc = Math.round(progress(n.id) * 100);
+    // 期限：日付を変えるか共通の期限を選ぶと、すぐ保存（画面は閉じない）
+    const spanTxt = () => { const g = state.nodes[n.id] || n, sp = spanOf(g); return sp ? `${mdw(sp.from)} 〜 ${mdw(sp.to)}${g.deadline ? '（期限）' : ''}` : '期間はまだありません'; };
+    const spanEl = h('div', { class: 'muted' }, spanTxt());
+    const dl = h('input', { id: 'g-deadline', type: 'date', value: n.deadline || '' });
+    let dlRef = n.deadlineRef || null;
+    const link = dateLink(dl, dlRef, () => state.nodes[rootId(n.id)]?.deadlines || [], r => { dlRef = r; });
+    // 日付を選んでいる途中で共通の期限が増えないように、手を止めて少したってから保存する
+    let dlTimer = null;
+    const saveDl = () => { clearTimeout(dlTimer); dlTimer = setTimeout(commitDl, 600); };
+    const commitDl = () => {
+      const cur = state.nodes[n.id], v = dl.value || null;
+      if (!cur || (v === (cur.deadline || null) && dlRef === (cur.deadlineRef || null))) return;
+      let part = { deadline: v, deadlineRef: v ? dlRef : null };
+      if (v) {
+        const tmp = autoShare({ ...cur, ...part }, 'deadline', 'deadlineRef');
+        part = { ...part, deadlineRef: tmp.deadlineRef, ...(tmp.deadlines !== cur.deadlines ? { deadlines: tmp.deadlines } : {}) };
+        dlRef = tmp.deadlineRef;
+      }
+      store.patch(n.id, part);
+      pruneAutoDeadlines(rootId(n.id));
+      link.setRef(dlRef); spanEl.textContent = spanTxt(); show();
+    };
+    dl.addEventListener('input', saveDl); dl.addEventListener('change', saveDl);
+    const st = h('input', { id: 'g-start', type: 'date', value: startOf(n) });
+    const saveSt = () => {
+      const cur = state.nodes[n.id], v = st.value || null;
+      if (!cur || v === (cur.start || null)) return;
+      store.patch(n.id, { start: v });
+      spanEl.textContent = spanTxt(); show();
+      if (v && cur.deadline && v > cur.deadline) toast('開始日が期限より後になっています');
+    };
+    st.addEventListener('input', saveSt); st.addEventListener('change', saveSt);
+    const dlField = h('div', { class: 'stack', style: 'gap:6px' },
+      h('div', { class: 'two' }, field('開始日', dateClear(st)), field('期限', dateClear(dl, link))),
+      // それぞれの欄の真下に、その欄をもう片方にそろえるボタンを置く
+      h('div', { class: 'two' },
+        h('button', { class: 'btn small', type: 'button', onclick: () => {
+          if (!dl.value) return toast('先に期限を入れてください');
+          st.value = dl.value; saveSt(); toast('開始日を期限と同じ日にしました');
+        } }, '開始日を期限と同じ日に'),
+        h('button', { class: 'btn small', type: 'button', onclick: () => {
+          if (!st.value) return toast('先に開始日を入れてください');
+          dl.value = st.value; dlRef = null; clearTimeout(dlTimer); commitDl(); toast('期限を開始日と同じ日にしました');
+        } }, '期限を開始日と同じ日に')), link.el,
+      h('span', { class: 'hint' }, '変えるとすぐ保存されます。開始日は、初めは目標を作った日になっています。'));
+    // 達成率を変えても画面を閉じず、この場で数字とバーだけ更新する
+    const pcEl = h('b', { class: 'num' }, pc + '%'), barEl = bar(pc / 100), restEl = h('span', { class: 'small muted' });
+    // ±10%ボタン・1%刻みのバー・数字のどれでも変えられる。保存は手を止めて少したってから1回だけ
+    let val = goalProg(n), timer = null;
+    const range = h('input', { id: 'g-prog', type: 'range', min: '0', max: '100', step: '1', value: val, 'aria-label': '達成率', oninput: e => setP(e.target.value) });
+    const num = h('input', { id: 'g-prog-num', class: 'pnum', type: 'number', inputmode: 'numeric', min: '0', max: '100', step: '1', value: val, 'aria-label': '達成率（%）',
+      oninput: e => { if (e.target.value !== '') setP(e.target.value); }, onblur: () => { num.value = val; } });
+    const minus = h('button', { class: 'btn small', type: 'button', 'aria-label': '達成率を10%下げる', onclick: () => setP(val - 10) }, '−10%');
+    const plus = h('button', { class: 'btn small primary', type: 'button', 'aria-label': '達成率を10%上げる', onclick: () => setP(val + 10) }, '+10%');
+    const show = () => {
+      const cur = state.nodes[n.id] || n, p = kids(n.id).length ? Math.round(progress(n.id) * 100) : (cur.done && val >= 100 ? 100 : val);
+      pcEl.textContent = p + '%'; barEl.firstChild.style.width = p + '%'; barEl.classList.toggle('done', p >= 100);
+      minus.disabled = val <= 0; plus.disabled = val >= 100;
+      restEl.textContent = cur.estMin ? `見込み ${fmtMin(cur.estMin)}（残り約${fmtMin(cur.estMin * (1 - val / 100))}）` : '';
+    };
+    const setP = v => {
+      val = Math.min(100, Math.max(0, Math.round(Number(v) || 0)));
+      range.value = val; if (document.activeElement !== num) num.value = val;
+      show();
+      clearTimeout(timer);
+      timer = setTimeout(() => { const cur = state.nodes[n.id]; if (cur && (goalProg(cur) !== val)) goalPatch(cur, { progress: val, done: val >= 100 ? cur.done : false }); }, 400);
+    };
+    // 時間の見込みもここで入力できる（手を止めて少したってから保存）
+    let estTimer = null;
+    const hrs = h('input', { id: 'g-hours', class: 'pnum', type: 'number', inputmode: 'numeric', min: '0', step: '5', value: n.estMin || '', placeholder: '0', 'aria-label': 'かかる時間の見込み（分）',
+      oninput: () => { clearTimeout(estTimer); estTimer = setTimeout(() => { const cur = state.nodes[n.id], m = Math.round(Number(hrs.value) || 0); if (cur && (Number(cur.estMin) || 0) !== m) store.patch(n.id, { estMin: m }); show(); }, 400); } });
+    show();
+    const progCtl = h('div', { class: 'field' }, h('span', null, '達成率（バーは1%刻み・数字も入力できます）'),
+      h('div', { class: 'row' }, minus, range, plus),
+      h('div', { class: 'row', style: 'gap:6px' }, num, h('span', null, '%'), h('span', { class: 'grow' }), restEl));
+    // 時間の見込みは、中に項目がある目標でも入れられる
+    const hasKidsNow = kids(n.id).length > 0;
+    const estCtl = h('div', { class: 'field' }, h('span', null, 'かかる時間の見込み'),
+      h('div', { class: 'row', style: 'gap:6px' }, hrs, h('span', null, '分'), h('span', { class: 'hint grow', style: 'font-weight:400' },
+        hasKidsNow ? (subtreeHasEst(n.id) ? '中の項目に見込み時間があるので、予測には中の合計を使います' : '中の項目に見込み時間がないときは、この時間を使います')
+          : n.deadline ? '残りを期限まで毎日割り振って予測します' : '期限を入れると、毎日の予測時間に入ります')));
+    return [
+      h('div', { class: 'crumb' }, path(n.id) || '大きな目標'),
+      h('div', { class: 'diff small' }, h('div', null, '進み具合：', pcEl), barEl,
+        spanEl,
+        kids(n.id).length && remainMin(n) >= 1 ? h('div', { class: 'muted' }, `この中の残り時間の見込み：約${fmtMin(remainMin(n))}`) : null),
+      dlField,
+      // 下に何もない目標は、ここで達成率をすぐ上げ下げできる
+      kids(n.id).length ? null : progCtl,
+      estCtl,
+      h('div', { class: 'stack', style: 'gap:8px' },
+        h('button', { class: 'btn', type: 'button', onclick: go(() => openNode({ parent: n.id, type: 'goal' })) }, icon('goal'), '小さい目標を追加'),
+        h('button', { class: 'btn', type: 'button', onclick: go(() => openNode({ parent: n.id, type: 'material' })) }, icon('material'), '教材を追加'),
+        h('button', { class: 'btn', type: 'button', onclick: go(() => openNode({ parent: n.id, type: 'task' })) }, icon('task'), 'タスクを追加'),
+        h('button', { class: 'btn', type: 'button', onclick: go(() => openBulk(n)) }, icon('plus'), '科目をまとめて追加'),
+        h('button', { class: 'btn primary', type: 'button', onclick: go(() => openNode(n)) }, icon('edit'), 'この目標を編集'),
+        convertRow(n, close)),
+    ];
+  });
+}
+
+// 目標名の横の＋：その目標の中に何を追加するか選ぶ
+function openAddMenu(n) {
+  openSheet(`「${n.title}」に追加`, (close) => {
+    const go = f => () => { close(); f(); };
+    return [h('div', { class: 'stack', style: 'gap:8px' },
+      h('button', { class: 'btn', type: 'button', onclick: go(() => openNode({ parent: n.id, type: 'goal' })) }, icon('goal'), '小さい目標'),
+      h('button', { class: 'btn', type: 'button', onclick: go(() => openNode({ parent: n.id, type: 'material' })) }, icon('material'), '教材'),
+      h('button', { class: 'btn', type: 'button', onclick: go(() => openNode({ parent: n.id, type: 'task' })) }, icon('task'), 'タスク'),
+      h('button', { class: 'btn', type: 'button', onclick: go(() => openBulk(n)) }, icon('plus'), '科目をまとめて追加'))];
+  });
+}
+
+// --- 目標ツリー（リスト表示） ---
+function viewTree(v) {
+  const roots = kids(null);
+  v.append(h('div', { class: 'btns' }, h('button', { class: 'btn primary', onclick: () => openNode({ parent: null, type: 'goal' }) }, icon('plus'), '大きな目標を追加'),
+    roots.length ? h('button', { class: 'btn', 'aria-pressed': String(sorting), onclick: () => { sorting = !sorting; render(); } }, sorting ? '並べ替えを終わる' : '並べ替え') : null));
+  if (!roots.length) { v.append(emptyStart()); return; }
+  const tree = h('div', { class: 'card tree' });
+  const walk = (n, box) => {
+    if (hiddenDone(n)) return;
+    visibleSel.push(n.id);
+    const ks = kids(n.id), open = expanded.has(n.id), p = progress(n.id);
+    const meta = [];
+    if (n.type === 'goal' && n.deadline) { const d = diffDays(today(), n.deadline); meta.push(h('span', { class: 'pill ' + (d < 0 ? 'warn' : 'plain') }, d < 0 ? `${md(n.deadline)} 期限切れ` : `${md(n.deadline)}まで あと${d}日`)); }
+    if (n.type === 'material') { const pl = plan(n); meta.push(h('span', null, lapText(n))); if (lapInfo(n).finished) meta.push(h('span', { class: 'pill ok' }, roundsOf(n) > 1 ? `${roundsOf(n)}周完了` : '完了')); if (n.end) meta.push(h('span', { class: 'pill plain' }, `${md(n.end)}まで`)); if (!pl.notStarted && pl.todayQ) meta.push(h('span', { class: 'pill' }, `今日 ${pl.todayQ}${n.unit || ''}`)); }
+    if (n.type === 'task' && n.date) meta.push(h('span', null, mdw(n.date)));
+    if (n.type === 'task' && todoCount(n)) meta.push(h('span', { class: 'pill' }, `やること ${todoCount(n)}`));
+    // 中に表示するものがない目標にはトグルを出さない（完了して隠れているものだけのときも）
+    const canHaveKids = n.type === 'goal' && ks.some(k => !hiddenDone(k));
+    box.append(h('div', { class: 'node' + (selected.has(n.id) ? ' sel' : ''), 'data-id': n.id, 'data-parent': n.parent || '' },
+      canHaveKids ? h('button', { class: 'tw' + (open ? ' open' : ''), 'aria-label': open ? '閉じる' : '開く', 'aria-expanded': String(open), onclick: () => { open ? expanded.delete(n.id) : expanded.add(n.id); saveOpen(); render(); } }, icon('chev')) :
+        (n.type === 'task' ? h('button', { class: 'check' + (n.done ? ' on' : ''), 'aria-label': '完了を切り替え', onclick: () => store.patch(n.id, taskDonePatch(n, !n.done)) }, n.done ? icon('ok') : null) : h('span')),
+      n.type === 'task' ? h('span') : icon(n.type, 'ic ' + n.type),
+      h('div', { class: 'main', onclick: () => (selecting ? toggleSel(n.id) : n.type === 'task' ? openTaskSheet(n) : openNode(n)), role: 'button', tabindex: '0', onkeydown: e => { if (e.key === 'Enter') (n.type === 'task' ? openTaskSheet(n) : openNode(n)); } },
+        h('div', { class: 'title' }, n.title), meta.length ? h('div', { class: 'meta' }, meta) : null, bar(p)),
+      selecting ? selBox(n) : sorting ? h('button', { class: 'grip', type: 'button', 'aria-label': `${n.title}を並べ替え（ドラッグ、または上下キー）`,
+        onpointerdown: e => startDrag(e, n),
+        onkeydown: e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); moveNode(n, e.key === 'ArrowUp' ? -1 : 1); } } }, icon('grip'))
+        : h('span', { class: 'row', style: 'gap:6px' },
+          n.type === 'goal' ? h('button', { class: 'btn icon small addbtn', type: 'button', 'aria-label': `${n.title}の中に追加`, onclick: () => openAddMenu(n) }, icon('plus')) : null,
+          h('span', { class: 'pct' }, Math.round(p * 100) + '%'))));
+    if (canHaveKids && open) {
+      const k = h('div', { class: 'kids' });
+      ks.forEach(c => walk(c, k));
+      box.append(k);
+    }
+  };
+  roots.forEach(r => walk(r, tree));
+  if (!tree.childElementCount) tree.append(h('div', { class: 'small muted', style: 'padding:12px' }, 'すべて完了しています。完了したものは「完了したものを表示」で見られます。'));
+  v.append(tree);
+  v.append(h('p', { class: 'hint' }, '目標名の右の ＋ を押すと、その中に「小さい目標」「教材」「タスク」を何段でも追加できます。下の段が進むと、上の目標の％も上がります。「並べ替え」を押して右端の ≡ をつかみ、上下に動かして離すと順番が変わります。入れる目標は各項目の編集画面の「場所」で変えられます。'));
+}
+
+// --- 課題 ---
+function asgCard(a) {
+  const d = diffDays(today(), a.due), pr = asgProg(a);
+  const left = a.estMin ? a.estMin * (1 - pr / 100) : 0;
+  return h('div', { class: 'card row' },
+    h('div', { class: 'due' + (d <= 2 && !a.done ? ' soon' : '') }, d < 0 ? '過ぎた' : d === 0 ? '今日' : `${d}日`, h('small', null, md(a.due))),
+    h('div', { class: 'grow stack', style: 'gap:4px' },
+      h('div', null, a.subject ? h('div', { class: 'crumb' }, a.subject) : null, h('div', { class: 'title' }, a.title)),
+      h('div', { class: 'row', style: 'gap:8px' }, h('div', { class: 'grow' }, bar(pr / 100)), h('b', { class: 'num small' }, pr + '%'),
+        a.done || pr >= 100 ? null : h('button', { class: 'btn small', 'aria-label': `${a.title}の達成度を10%上げる`, onclick: () => asgPatch(a, { progress: Math.min(100, pr + 10) }) }, '+10%')),
+      h('div', { class: 'small muted' }, `${md(a.start)}〜${md(a.due)}${a.estMin ? `・見込み ${fmtMin(a.estMin)}${pr > 0 && pr < 100 ? `（残り約${fmtMin(left)}）` : ''}` : ''}`)),
+    h('button', { class: 'check' + (a.done ? ' on' : ''), 'aria-label': '提出済みにする', onclick: () => { asgPatch(a, { done: !a.done }); if (!a.done) toast('提出済みにしました'); } }, a.done ? icon('ok') : null),
+    h('button', { class: 'btn icon ghost', 'aria-label': '編集', onclick: () => openAsg(a) }, icon('edit')));
+}
+function viewAsg(v) {
+  v.append(h('div', { class: 'btns' }, h('button', { class: 'btn primary', onclick: () => openAsg(null) }, icon('plus'), '課題を追加')));
+  const all = Object.values(state.asgs).sort((a, b) => a.due.localeCompare(b.due));
+  const open = all.filter(a => !a.done), done = all.filter(a => a.done);
+  const s = h('section', { class: 'section' }, h('h2', null, `未提出 ${open.length}件`));
+  if (!open.length) s.append(h('div', { class: 'card small muted' }, '未提出の課題はありません。「課題を追加」から〆切と達成度を管理できます。'));
+  open.forEach(a => s.append(asgCard(a)));
+  v.append(s);
+  if (done.length) { const s2 = h('section', { class: 'section' }, h('h2', null, `提出済み ${done.length}件`)); done.slice(-10).reverse().forEach(a => s2.append(asgCard(a))); v.append(s2); }
+}
+
+// --- 記録タブ：日付を選んで、教材ごとにやった量を数字で入れる。下に1週間/1か月のまとめ ---
+let logDay = null;
+function viewLog(v) {
+  const t = today(), d = logDay && logDay <= t ? logDay : t;
+  const mats = Object.values(state.nodes).filter(m => m.type === 'material' && ((!m.done && (!m.start || m.start <= d)) || (Number((m.log || {})[d]) || 0) > 0))
+    .sort((a, b) => path(a.id).localeCompare(path(b.id), 'ja') || (a.order ?? 0) - (b.order ?? 0));
+  const go = x => { logDay = x > t ? t : x; render(); };
+  const pick = h('input', { id: 'logday', type: 'date', value: d, max: t, onchange: e => e.target.value && go(e.target.value) });
+  v.append(h('div', { class: 'card row logday' },
+    h('button', { class: 'btn small', 'aria-label': '前の日', onclick: () => go(addDays(d, -1)) }, '‹'),
+    h('div', { class: 'grow', style: 'text-align:center' }, h('div', { class: 'title' }, mdw(d) + (d === t ? '・今日' : d === addDays(t, -1) ? '・昨日' : '')), pick),
+    h('button', { class: 'btn small', 'aria-label': '次の日', disabled: d >= t, onclick: () => go(addDays(d, 1)) }, '›')));
+
+  // この日の記録
+  const s = h('section', { class: 'section' }, h('h2', null, '教材：この日にやった量'));
+
+  for (const m of mats) {
+    const u = m.unit || '', cur = (m.log || {})[d], r = rateOf(m);
+    const q = d === t ? plan(m).todayQ : null;
+    const inp = h('input', { type: 'number', inputmode: 'numeric', min: '0', class: 'log-cell', value: cur ?? '', placeholder: isOff(m, d) ? '休み' : '0', 'aria-label': `${m.title}のやった量` });
+    inp.addEventListener('change', () => {
+      const val = inp.value === '' ? 0 : Math.max(0, Number(inp.value) || 0);
+      store.patch(m.id, { log: { [d]: val } }); toast(`${m.title}：${md(d)} を${val}${u}で記録しました`);
+    });
+    s.append(h('div', { class: 'card row' },
+      h('div', { class: 'grow' }, h('div', { class: 'crumb' }, path(m.id)), h('div', { class: 'title' }, m.title),
+        h('div', { class: 'small muted' }, [q ? `今日のノルマ ${q}${u}` : null, r && cur ? `${fmtMin(cur * r)}` : null, `全体 ${doneTotal(m)}/${grand(m)}${u}`].filter(Boolean).join('・'))),
+      h('div', { class: 'stack', style: 'align-items:flex-end;gap:6px' },
+        h('span', { class: 'log-in' }, inp, h('span', { class: 'small' }, u)),
+        q && Number(cur || 0) < q ? h('button', { class: 'btn small', onclick: () => { store.patch(m.id, { log: { [d]: q } }); toast(`${m.title}：ノルマ ${q}${u} を記録しました`); } }, 'ノルマを入れる') : null)));
+  }
+  if (mats.length) v.append(s); // 教材がなければ、この欄ごと出さない
+
+  // この日に終えた・進めたタスク・目標・課題（チェックや達成度から自動で並ぶ）。かかった時間を自分で入れられる
+  const ws = workItems(d).sort((a, b) => (a.kind === 'asg') - (b.kind === 'asg') || (a.kind === 'asg' ? '' : path(a.id)).localeCompare(b.kind === 'asg' ? '' : path(b.id), 'ja'));
+  const s2 = h('section', { class: 'section' }, h('h2', null, `この日に終えた・進めたもの ${ws.length}件`));
+  if (!ws.length) s2.append(h('div', { class: 'card small muted' }, 'この日にチェックしたり、達成度を上げたりしたタスク・目標・課題はありません。'));
+  for (const x of ws) {
+    const isA = x.kind === 'asg', pt = x.progToday?.date === d ? x.progToday : null, est = workEst(x, d), set = x.workMin && x.workMin[d] != null;
+    const st = x.doneOn === d || (x.done && (pt || !x.doneOn)) ? (isA ? '提出' : '完了') : pt ? `${pt.from}% → ${progOf(x)}%` : '進めた';
+    const inp = h('input', { type: 'number', inputmode: 'numeric', min: '0', step: '5', class: 'log-cell', value: set ? x.workMin[d] : '', placeholder: est ? String(Math.round(est)) : '—', 'aria-label': `${x.title}にかかった時間（分）` });
+    inp.addEventListener('change', () => {
+      const v2 = inp.value === '' ? null : Math.max(0, Math.round(Number(inp.value) || 0));
+      store.patch(x.id, { workMin: { [d]: v2 } }); toast(v2 == null ? `${x.title}：見込み時間に戻しました` : `${x.title}：${v2}分で記録しました`);
+    });
+    s2.append(h('div', { class: 'card row' },
+      h('div', { class: 'grow' }, h('div', { class: 'crumb' }, isA ? ['課題', x.subject].filter(Boolean).join(' › ') : path(x.id)), h('div', { class: 'title' }, x.title),
+        h('div', { class: 'small muted' }, [st, set ? (est ? `見込み ${fmtMin(est)}` : null) : est ? `見込み ${fmtMin(est)} で計算中` : '見込み時間なし'].filter(Boolean).join('・'))),
+      h('span', { class: 'log-in' }, inp, h('span', { class: 'small' }, '分'))));
+  }
+  if (ws.length) s2.append(h('p', { class: 'hint', style: 'margin:0' }, '実際にかかった時間（分）を入れられます。空のときは見込み時間から計算します。チェックを外すと、ここからも消えます。'));
+  v.append(s2);
+
+  // 1週間 / 1か月 のまとめ（今日までの N 日）
+  const N = LOG_RANGES[logRange][1], days = [...Array(N)].map((_, i) => addDays(t, -i));
+  const all = Object.values(state.nodes).filter(m => m.type === 'material');
+  const perDay = days.map(x => { let min = 0, cnt = 0; for (const m of all) { const a = Number((m.log || {})[x]) || 0; if (a) { cnt++; min += a * rateOf(m); } }
+    for (const w of workItems(x)) { cnt++; min += workMinOf(w, x); } return { d: x, min, cnt }; });
+  const perMat = all.map(m => ({ m, amt: days.reduce((s2, x) => s2 + (Number((m.log || {})[x]) || 0), 0) })).filter(x => x.amt > 0);
+  const totMin = perDay.reduce((s2, x) => s2 + x.min, 0);
+  // タスク・目標・課題：期間内に終えた・進めた日の時間を足す
+  const wmap = new Map();
+  for (const x of days) for (const w of workItems(x)) { const e = wmap.get(w.id) || { x: w, min: 0, done: false, n: 0 }; e.min += workMinOf(w, x); e.n++; if (w.doneOn === x || (w.done && (!w.doneOn))) e.done = true; wmap.set(w.id, e); }
+  const perWork = [...wmap.values()].map(e => ({ ...e, st: e.done ? (e.x.kind === 'asg' ? '提出' : '完了') : `${e.n}日進めた` })).sort((a, b) => b.min - a.min);
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'まとめる期間' }, Object.entries(LOG_RANGES).map(([k, [l]]) =>
+    h('button', { type: 'button', 'aria-pressed': String(logRange === k), onclick: () => { logRange = k; try { localStorage.setItem('log-range', k); } catch {} render(); } }, l)));
+  const tbl = (heads, rows) => h('div', { class: 'tbl-wrap' }, h('table', null, h('thead', null, h('tr', null, heads.map(x => h('th', null, x)))), h('tbody', null, rows)));
+  v.append(h('section', { class: 'section' }, h('h2', null, `まとめ（${LOG_RANGES[logRange][0]}）`), seg,
+    h('div', { class: 'card small' }, '合計 ', h('b', { class: 'num' }, fmtMin(totMin)), `（1日平均 ${fmtMin(totMin / N)}）・記録した日 ${perDay.filter(x => x.cnt).length}/${N}日`),
+    perMat.length || perWork.length ? tbl(['項目', 'やった量', '時間'], [
+      ...perMat.map(({ m, amt }) => h('tr', null, h('td', null, m.title), h('td', { class: 'num' }, amt + (m.unit || '')), h('td', { class: 'num' }, rateOf(m) ? fmtMin(amt * rateOf(m)) : '—'))),
+      ...perWork.map(({ x, min, st }) => h('tr', null, h('td', null, x.title), h('td', { class: 'num' }, st), h('td', { class: 'num' + (min ? '' : ' off') }, min ? fmtMin(min) : '—')))])
+      : h('div', { class: 'card small muted' }, 'この期間の記録はまだありません。'),
+    tbl(['日付', '件数', '時間'], perDay.map(x => h('tr', { class: 'pick' + (x.d === d ? ' on' : ''), onclick: () => { go(x.d); window.scrollTo(0, 0); } },
+      h('td', null, mdw(x.d)), h('td', { class: 'num' + (x.cnt ? '' : ' off') }, x.cnt ? `${x.cnt}件` : '—'), h('td', { class: 'num' + (x.min ? '' : ' off') }, x.min ? fmtMin(x.min) : '—')))),
+    h('p', { class: 'hint', style: 'margin:0' }, '日付の行を押すと、その日の記録を上で直せます。件数は記録した教材と、終えた・進めたタスク・目標・課題の数です。時間は、教材は「1周の時間」から、タスクなどは入れた時間（なければ見込み時間）から計算します。')));
+}
+
+// --- 設定 ---
+function viewSettings(v) {
+  const s = state.settings;
+  const offs = h('section', { class: 'section' }, h('h2', null, '休みの期間（すべての教材で休む）'));
+  const list = h('div', { class: 'card stack' });
+  (s.offRanges || []).forEach(r => list.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 'title' }, r.label || '休み'), h('div', { class: 'small muted num' }, `${mdw(r.from)} 〜 ${mdw(r.to)}`)),
+    h('button', { class: 'btn small danger', onclick: () => saveSettings({ offRanges: s.offRanges.filter(x => x.id !== r.id) }) }, '削除'))));
+  const lab = h('input', { id: 'off-label', placeholder: '例：後期中間テスト' }), f = h('input', { id: 'off-from', type: 'date', value: today() }), t = h('input', { id: 'off-to', type: 'date', value: addDays(today(), 4) });
+  list.append(h('div', { class: 'stack' }, h('label', { class: 'field' }, h('span', null, '名前'), lab), h('div', { class: 'two' }, h('label', { class: 'field' }, h('span', null, '開始'), f), h('label', { class: 'field' }, h('span', null, '終了'), t)),
+    h('button', { class: 'btn', onclick: () => { if (!f.value || !t.value || t.value < f.value) return toast('開始日と終了日を正しく入れてください'); saveSettings({ offRanges: [...(s.offRanges || []), { id: uid('off'), label: lab.value.trim(), from: f.value, to: t.value }] }); toast('休みの期間を追加しました。教材の量を組み直しました'); } }, '休みの期間を追加')));
+  offs.append(list, h('p', { class: 'hint' }, 'テスト期間や旅行など、教材を進めない日です。曜日ごとの休みは、教材ごとに設定できます。'));
+  v.append(offs);
+
+  const night = h('select', { id: 'night-hour', onchange: e => saveSettings({ nightHour: Number(e.target.value) }) }, [19, 20, 21, 22, 23].map(x => h('option', { value: x, selected: Number(s.nightHour) === x }, `${x}:00`)));
+  v.append(h('section', { class: 'section' }, h('h2', null, '夜のリマインド'), h('div', { class: 'card stack' },
+    h('label', { class: 'field' }, h('span', null, 'この時刻を過ぎても残っていたら「まだ残っています」を表示'), night),
+    h('p', { class: 'hint', style: 'margin:0' }, 'いまはアプリを開いたときに表示されます。スマホに届くプッシュ通知はまだありません。'))));
+
+  v.append(h('section', { class: 'section' }, h('h2', null, '保存と同期'), h('div', { class: 'card stack small' },
+    h('div', null, store.mode === 'sync' ? `${fb?.user?.email || ''} のアカウントに保存しています。同じアカウントでログインした iPhone と iPad で同じデータが見られます。` : 'この端末だけに保存しています。'),
+    store.mode === 'sync' ? h('div', null, h('button', { class: 'btn small', type: 'button', onclick: () => fb.A.signOut(fb.auth) }, 'ログアウト')) : null,
+    h('div', { class: 'muted' }, `目標・教材・タスク ${Object.keys(state.nodes).length}件、課題 ${Object.keys(state.asgs).length}件`),
+    Object.keys(state.nodes).length ? null : h('div', null, h('button', { class: 'btn', onclick: loadSample }, '例（TOEIC 800点）を読み込む')))));
+  v.append(migrateSection(MIGRATE_IMPORT));
+}
+function saveSettings(part) { store.put({ id: 'settings', kind: 'settings', ...state.settings, ...part }); }
+
+// ---------- データの引っ越し（書き出し・読み込み） ----------
+const MIGRATE_IMPORT = true; // このアプリは目標ツリーからの読み込みができる
+function exportJSON() {
+  return JSON.stringify({ app: 'goal-tree', version: 1, exported: new Date().toISOString(),
+    docs: [...Object.values(state.nodes), ...Object.values(state.asgs), { id: 'settings', kind: 'settings', ...state.settings }] });
+}
+function copyText(text, ta) {
+  const fallback = () => { ta.focus(); ta.select(); toast('選択しました。「コピー」を押してください'); };
+  try { navigator.clipboard.writeText(text).then(() => toast('コピーしました'), fallback); } catch { fallback(); }
+}
+function importDocs(text) {
+  let data; try { data = JSON.parse(text); } catch { toast('読み込めませんでした。コピーした文字を全部貼り付けてください'); return false; }
+  const docs = data && data.app === 'goal-tree' && Array.isArray(data.docs) ? data.docs : null;
+  if (!docs) { toast('目標ツリーから書き出したデータではないようです'); return false; }
+  const ok = docs.filter(d => d && typeof d.id === 'string' && /^[A-Za-z0-9_~:@+-][A-Za-z0-9_.~:@+-]{0,150}$/.test(d.id) && ['node', 'asg', 'settings'].includes(d.kind));
+  ok.forEach(d => { if (d.kind === 'node' && d.type === 'goal' && !d.parent) expanded.add(d.id); store.put(d); });
+  saveOpen(); toast(`${ok.length}件を読み込みました`); return true;
+}
+function migrateSection(canImport) {
+  const out = h('textarea', { id: 'export-text', readonly: true, rows: '3', class: 'mig', hidden: true });
+  const card = h('div', { class: 'card stack small' },
+    h('div', null, canImport ? 'ほかの端末やアプリにデータを移すときに使います。' : '新しい「目標ロードマップ」にデータを移すときに使います。下のボタンでコピーして、新しいアプリの「設定 → データの引っ越し」に貼り付けてください。'),
+    h('div', { class: 'btns' }, h('button', { class: 'btn' + (canImport ? '' : ' primary'), type: 'button', onclick: () => { out.value = exportJSON(); out.hidden = false; copyText(out.value, out); } }, 'データをコピー')), out);
+  if (canImport) {
+    const inp = h('textarea', { id: 'import-text', rows: '3', class: 'mig', placeholder: '目標ツリーの「データをコピー」でコピーした文字を、ここに貼り付け' });
+    const has = Object.keys(state.nodes).length + Object.keys(state.asgs).length > 0;
+    const run = () => { if (!inp.value.trim()) return toast('先にデータを貼り付けてください'); if (importDocs(inp.value.trim())) inp.value = ''; };
+    card.append(h('div', { class: 'title', style: 'margin-top:6px' }, '目標ツリーから読み込む'), inp,
+      h('div', { class: 'btns' }, has ? deleteButton('読み込む', run, '同じ項目は上書きされます。もう一度押して読み込む') : h('button', { class: 'btn primary', type: 'button', onclick: run }, '読み込む')),
+      h('p', { class: 'hint', style: 'margin:0' }, '今あるデータは消えません。同じ項目（前に読み込んだもの）だけ上書きされます。'));
+  }
+  return h('section', { class: 'section' }, h('h2', null, 'データの引っ越し'), card);
+}
+
+// ---------- シート ----------
+function openSheet(title, build) {
+  const root = document.getElementById('sheet-root');
+  const close = () => { root.replaceChildren(); document.removeEventListener('keydown', esc); };
+  const esc = e => { if (e.key === 'Escape') close(); };
+  const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
+  const scrim = h('div', { class: 'scrim', onclick: e => { if (e.target === scrim) close(); } }, sheet);
+  root.replaceChildren(scrim); document.addEventListener('keydown', esc);
+  const fill = (t, b) => { sheet.replaceChildren(h('div', { class: 'row' }, h('h3', { class: 'grow' }, t), h('button', { class: 'btn ghost small', onclick: close }, '閉じる')), ...[].concat(b).filter(x => x != null && x !== false)); sheet.scrollTop = 0; };
+  fill(title, build(close, fill));
+  sheet.querySelector('input:not([type=date]), textarea')?.focus({ preventScroll: true });
+}
+const field = (label, input, hint) => h('label', { class: 'field' }, h('span', null, label), input, hint ? h('span', { class: 'hint', style: 'font-weight:400' }, hint) : null);
+// スライダーは10%刻み。右の数字を押すと0〜100の好きな数を入力できる
+function progressField(value, onpick) {
+  const set = v => { value = Math.min(100, Math.max(0, Math.round(Number(v) || 0))); onpick(value); r.value = value; out.textContent = value + '%'; };
+  const r = h('input', { id: 'a-progress', type: 'range', min: '0', max: '100', step: '10', value, list: 'p-ticks', 'aria-label': '課題の達成度', oninput: e => set(e.target.value) });
+  const out = h('button', { type: 'button', class: 'btn small num wout', 'aria-label': '達成度を数字で入力', onclick: () => { out.hidden = true; box.hidden = false; num.value = value; num.focus(); num.select(); } });
+  const num = h('input', { id: 'a-progress-num', class: 'pnum', type: 'number', inputmode: 'numeric', min: '0', max: '100', step: '1', 'aria-label': '達成度（%）' });
+  const box = h('span', { class: 'row', style: 'gap:4px;flex:none', hidden: true }, num, '%');
+  const finish = () => { if (box.hidden) return; set(num.value); box.hidden = true; out.hidden = false; };
+  num.addEventListener('input', () => { if (num.value !== '') { const v = Math.min(100, Math.max(0, Math.round(Number(num.value) || 0))); value = v; onpick(v); r.value = v; } });
+  num.addEventListener('blur', finish);
+  num.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); finish(); } });
+  set(value);
+  return h('div', { class: 'field' }, h('span', null, '達成度（バーは10%刻み・右の数字を押すと数字で入力）'),
+    h('div', { class: 'row' }, r, out, box),
+    h('datalist', { id: 'p-ticks' }, [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(x => h('option', { value: x }))),
+    h('div', { class: 'row small muted', style: 'justify-content:space-between' }, h('span', null, '0%（まだ）'), h('span', null, '100%（できた）')));
+}
+function deleteButton(label, onconfirm, armedLabel = 'もう一度押すと削除します') {
+  let armed = false;
+  const b = h('button', { class: 'btn danger', type: 'button', onclick: () => { if (armed) return onconfirm(); armed = true; b.classList.add('armed'); b.textContent = armedLabel; setTimeout(() => { armed = false; b.classList.remove('armed'); b.textContent = label; }, 3500); } }, label);
+  return b;
+}
+
+// 日付の欄＋「×」（未設定にする）。iPhoneの日付の欄は空に戻しにくいため。
+// 共通の期限とつながっていればそれも外し、保存の仕組みが気づけるように入力の合図を出す
+function dateClear(input, link) {
+  const btn = h('button', { class: 'btn icon ghost dclear', type: 'button', 'aria-label': '日付を未設定にする', title: '未設定にする',
+    onclick: () => { input.value = ''; link?.setRef(null); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); } }, '×');
+  return h('div', { class: 'row', style: 'gap:4px' }, input, btn);
+}
+// 日付入力の下に「共通の期限」のチップを並べる。選ぶと連動し、自分で日付を変えると連動が外れる
+function dateLink(input, ref, getShared, onRef, quiet) {
+  const box = h('div', { class: 'chips' });
+  const draw = () => {
+    const list = getShared().filter(d => d.date);
+    const cur = list.find(d => d.id === ref);
+    if (ref && !cur) { ref = null; onRef(null); }
+    if (cur && input.value !== cur.date) { input.value = cur.date; input.dispatchEvent(new Event('input')); }
+    box.hidden = !!quiet && !list.length;
+    if (!list.length) { box.replaceChildren(h('span', { class: 'hint' }, '大きな目標に「共通の期限」を登録すると、ここで選べます')); return; }
+    box.replaceChildren(h('span', { class: 'hint' }, '共通の期限：'), ...list.map(d => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(ref === d.id), onclick: () => { ref = ref === d.id ? null : d.id; onRef(ref); draw(); } }, `${d.label || '期限'} `, h('span', { class: 'num' }, md(d.date)))));
+  };
+  input.addEventListener('input', e => { if (e.isTrusted && ref) { ref = null; onRef(null); draw(); } });
+  draw();
+  // setRef：外から日付を変えたときに、共通の期限とのつながりも合わせる
+  return { el: box, draw, setRef: r => { ref = r || null; onRef(ref); draw(); } };
+}
+function deadlineEditor(dls, onchange) {
+  const box = h('div', { class: 'field' });
+  const draw = () => {
+    box.replaceChildren(h('span', null, '共通の期限（この目標の中で使いまわせる）'),
+      ...dls.map(d => h('div', { class: 'row dlrow' },
+        h('input', { id: 'dl-l-' + d.id, value: d.label, placeholder: '例：本番', style: 'flex:1.2', oninput: e => { d.label = e.target.value; onchange(); } }),
+        h('input', { id: 'dl-d-' + d.id, type: 'date', value: d.date, style: 'flex:1', oninput: e => { d.date = e.target.value; onchange(); } }),
+        h('button', { type: 'button', class: 'btn icon ghost', 'aria-label': `${d.label || '期限'}を削除`, onclick: () => { dls.splice(dls.indexOf(d), 1); draw(); onchange(); } }, '×'))),
+      h('div', null, h('button', { type: 'button', class: 'btn small', onclick: () => { const d = { id: uid('dl'), label: '', date: '' }; dls.push(d); draw(); onchange(); document.getElementById('dl-l-' + d.id)?.focus(); } }, icon('plus'), '共通の期限を追加')),
+      h('span', { class: 'hint', style: 'font-weight:400' }, '日付を変えて保存すると、この期限を選んでいる目標・教材・タスクの日付もまとめて変わります。'));
+  };
+  draw(); return box;
+}
+
+// --- 目標・教材・タスクの編集 ---
+function openNode(n) {
+  ensureShared(n.parent ? rootId(n.parent) : n.id);
+  const isNew = !n.id;
+  const type = n.type;
+  const names = { goal: '目標', material: '教材', task: 'タスク' };
+  openSheet(isNew ? `${names[type]}を追加` : `${names[type]}を編集`, (close) => {
+    const parentName = n.parent ? state.nodes[n.parent]?.title : null;
+    const isRoot = type === 'goal' && !n.parent;
+    const dls = isRoot ? structuredClone(n.deadlines || []) : null;
+    const shared = () => isRoot ? dls : (state.nodes[rootId(n.parent)]?.deadlines || []);
+    const title = h('input', { id: 'n-title', value: n.title || '', placeholder: type === 'goal' ? (n.parent ? '例：公式問題集を1月末までに終える' : '例：3月までにTOEIC 800点') : type === 'material' ? '例：金のフレーズ 1周' : '例：模試を1回解く' });
+    const out = [parentName ? h('div', { class: 'crumb' }, isNew ? `「${parentName}」の下に追加` : `「${parentName}」の中`) : null, field('名前', title)];
+    let get = () => ({});
+    // 場所：複数選べる。1つ目にこの項目を置き、2つ目からはコピーを作る（'' はいちばん上）
+    let newParent = n.parent || null;
+    const places = new Set([n.parent || '']);
+    let syncPlaces = () => {}; // 自動保存のあと、チェックを今の場所だけに戻す
+    {
+      const banned = isNew ? new Set() : new Set([n.id, ...descendants(n.id)]), opts = [];
+      if (type === 'goal') opts.push(['', 'いちばん上（大きな目標にする）', 0]);
+      const walkOpts = (pid, depth) => kids(pid).forEach(k => { if (k.type !== 'goal' || banned.has(k.id)) return; opts.push([k.id, k.title, depth]); walkOpts(k.id, depth + 1); });
+      walkOpts(null, 0);
+      const note = h('span', { class: 'hint', style: 'font-weight:400' });
+      const nameOf = id => id ? (state.nodes[id]?.title || '') : 'いちばん上';
+      const drawNote = () => { note.textContent = !places.size ? '場所を1つ以上選んでください'
+        : `選んでいる場所：${[...places].map(nameOf).join('、')}` + (places.size === 1 ? '（ほかにもチェックすると、そこにコピーを作ります）' : `（${places.size}か所。今の場所以外はコピーを作ります）`); };
+      const box = h('div', { class: 'places', role: 'group', 'aria-label': '場所' },
+        opts.map(([id, label, depth]) => h('label', { class: 'place', 'data-place': id, style: `padding-left:${10 + Math.min(depth, 4) * 14}px` },
+          h('input', { type: 'checkbox', checked: places.has(id), onchange: e => { e.target.checked ? places.add(id) : places.delete(id); drawNote(); } }), label)));
+      drawNote();
+      syncPlaces = () => { box.querySelectorAll('.place').forEach(l => { l.querySelector('input').checked = places.has(l.dataset.place); }); drawNote(); };
+      // 開いたときに、今の場所が見える位置までリストをスクロール
+      requestAnimationFrame(() => { const on = box.querySelector('input:checked')?.closest('.place'); if (on) box.scrollTop = on.offsetTop - box.offsetTop - box.clientHeight / 2 + on.offsetHeight / 2; });
+      out.push(h('div', { class: 'field' }, h('span', null, '場所（どの目標の中に入れるか・複数選べます）'), box, note));
+    }
+    if (type === 'goal') {
+      const dl = h('input', { id: 'n-deadline', type: 'date', value: n.deadline || '' });
+      let dlRef = n.deadlineRef || null;
+      const link = dateLink(dl, dlRef, shared, r => dlRef = r, isRoot);
+      const gst = h('input', { id: 'n-goal-start', type: 'date', value: isNew ? (n.start || today()) : startOf(n) }); // 新しく作る目標は今日、既存の目標は作った日から
+      out.push(h('div', { class: 'stack', style: 'gap:6px' }, h('div', { class: 'two' }, field('開始日（なくてもOK）', dateClear(gst)), field('期限（なくてもOK）', dateClear(dl, link))),
+        h('div', { class: 'two' },
+          h('button', { class: 'btn small', type: 'button', onclick: () => { if (!dl.value) return toast('先に期限を入れてください'); gst.value = dl.value; } }, '開始日を期限と同じ日に'),
+          h('button', { class: 'btn small', type: 'button', onclick: () => { if (!gst.value) return toast('先に開始日を入れてください'); dl.value = gst.value; link.setRef(null); } }, '期限を開始日と同じ日に')), link.el));
+      if (isRoot) out.push(deadlineEditor(dls, link.draw));
+      const hasKids = !isNew && kids(n.id).length;
+      let done = !!n.done;
+      // 下に何もない目標だけ、達成率と予測時間を入力できる（下があるときは自動で計算）
+      const startProg = Math.min(100, Math.max(0, Number(n.progress) || 0));
+      let prog = startProg;
+      const ghrs = h('input', { id: 'n-goal-hours', type: 'number', inputmode: 'numeric', min: '0', step: '5', value: n.estMin || '', placeholder: '例：120' });
+      if (hasKids) out.push(h('p', { class: 'hint', style: 'margin:0' }, `達成率は下の項目から自動で計算しています（今 ${Math.round(progress(n.id) * 100)}%）。`));
+      else out.push(progressField(prog, v => { prog = v; }));
+      out.push(field('かかる時間の見込み（分・なくてもOK）', ghrs, hasKids
+        ? '中の項目に見込み時間が1つもないときは、この時間を使って予測します（中にあれば、中の合計を使います）'
+        : '期限があれば、残りの時間（見込み × まだの割合）を開始日から期限まで毎日同じだけ割り振って予測します'));
+      // 見込み時間を中のタスクに等分するか
+      let split = !!n.splitEst;
+      const kt = isNew ? 0 : splitTasks(n).length;
+      const splitNote = h('span', { class: 'hint', style: 'font-weight:400' });
+      const drawSplit = () => { const e = Math.round(Number(ghrs.value) || 0), sh = splitShares(e, kt);
+        splitNote.textContent = !kt ? '中にタスクを追加すると、その数で自動的に割ります。' : !e ? `上に見込み時間を入れると、中のタスク${kt}個に割ります。`
+          : `中のタスク${kt}個に、1個 ${Math.min(...sh) === Math.max(...sh) ? fmtMin(sh[0]) : `${Math.min(...sh)}〜${Math.max(...sh)}分`} ずつ割ります。タスクを足したり消したりすると、自動で割り直します。`; };
+      ghrs.addEventListener('input', drawSplit); drawSplit();
+      out.push(h('div', { class: 'stack', style: 'gap:4px' }, h('label', { class: 'row small' }, h('input', { type: 'checkbox', id: 'n-split', checked: split, onchange: e => { split = e.target.checked; splitNote.hidden = !split; } }), '見込み時間を中のタスクに等分する'), splitNote));
+      splitNote.hidden = !split;
+      if (!isNew) out.push(h('label', { class: 'row small' }, h('input', { type: 'checkbox', id: 'n-done', checked: done, onchange: e => done = e.target.checked }), hasKids ? '達成した（下の項目にかかわらず100%にする）' : '達成した'));
+      get = () => ({ start: gst.value || null, deadline: dl.value || null, deadlineRef: dlRef, done,
+        estMin: Math.round(Number(ghrs.value) || 0), splitEst: split,
+        ...(hasKids ? {} : { progress: prog }),
+        ...(!isNew && !hasKids && (prog !== startProg || done !== !!n.done) ? { progToday: n.progToday?.date === today() ? n.progToday : { date: today(), from: goalProg(n) } } : {}),
+        ...(isRoot ? { deadlines: dls.filter(d => d.date).map(d => ({ ...d, label: d.label.trim() })) } : {}) });
+    } else if (type === 'task') {
+      const dt = h('input', { id: 'n-date', type: 'date', value: n.date ?? (isNew ? today() : '') });
+      let dateRef = n.dateRef || null;
+      const link = dateLink(dt, dateRef, shared, r => dateRef = r);
+      out.push(h('div', { class: 'stack', style: 'gap:6px' }, field('やる日（入れると「今日」に表示）', dateClear(dt, link)), link.el));
+      const est = h('input', { id: 'n-est', type: 'number', inputmode: 'numeric', min: '0', step: '5', value: n.estMin ?? '', placeholder: '例：30' });
+      const sp = !isNew && n.parent && state.nodes[n.parent]?.splitEst ? state.nodes[n.parent] : null;
+      if (sp) est.disabled = true;
+      out.push(field('かかる時間（分・なくてもOK）', est, sp ? `「${sp.title}」の見込み時間を等分しています。変えるときは「${sp.title}」の見込み時間を変えるか、等分をオフにしてください。` : undefined));
+      const todo = h('textarea', { id: 'n-todo', rows: '4', placeholder: '1行に1つ（例：問1、問2、丸付けと解き直し）' }, (n.items || []).map(i => i.text).join('\n'));
+      out.push(field('やること（1行に1つ・なくてもOK）', todo, 'タスクの名前をタップすると、1つずつチェックできます'));
+      // 達成率：やることがないときに使う（やることがあれば、チェックした割合になる）
+      const startTProg = goalProg(n);
+      let tprog = startTProg;
+      const tpField = progressField(tprog, v => { tprog = v; });
+      const tpHint = h('p', { class: 'hint', style: 'margin:0' }, 'やることを入れているときは、達成率はチェックした割合になります。');
+      const syncTp = () => { const has = todo.value.trim().length > 0; tpField.hidden = has; tpHint.hidden = !has; };
+      todo.addEventListener('input', syncTp); syncTp();
+      out.push(tpField, tpHint);
+      get = () => {
+        // 行をやることに。前からある行はチェックの状態を引き継ぐ
+        const left = [...(n.items || [])];
+        const items = todo.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(text => { const i = left.findIndex(x => x.text === text); return i >= 0 ? left.splice(i, 1)[0] : { id: uid('i'), text, done: false }; });
+        const done = items.length ? items.every(i => i.done) : tprog >= 100;
+        return { date: dt.value || null, dateRef, items, done, doneOn: done ? (n.doneOn || today()) : null, estMin: Number(est.value) || 0,
+          ...(items.length ? {} : { progress: tprog }),
+          ...(!isNew && !items.length && tprog !== startTProg ? { progToday: n.progToday?.date === today() ? n.progToday : { date: today(), from: startTProg } } : {}) };
+      };
+    } else {
+      const unit = h('input', { id: 'n-unit', value: n.unit ?? '語', list: 'units' });
+      const total = h('input', { id: 'n-total', type: 'number', inputmode: 'numeric', min: '1', value: n.total ?? '' , placeholder: '1000' });
+      const init = h('input', { id: 'n-init', type: 'number', inputmode: 'numeric', min: '0', value: n.initDone ?? 0 });
+      const st = h('input', { id: 'n-start', type: 'date', value: n.start || today() });
+      const en = h('input', { id: 'n-end', type: 'date', value: n.end || addDays(today(), 29) });
+      const roundsIn = h('input', { id: 'n-rounds', type: 'number', inputmode: 'numeric', min: '1', step: '1', value: roundsOf(n) });
+      const hrs = h('input', { id: 'n-hours', type: 'number', inputmode: 'numeric', min: '0', step: '5', value: n.totalMin || '', placeholder: '例：1200' });
+      let skip = [...(n.skipDow || [])];
+      const dows = h('div', { class: 'dows', role: 'group', 'aria-label': '休む曜日' });
+      const drawDows = () => dows.replaceChildren(...DOW.map((d, i) => h('button', { type: 'button', 'aria-pressed': String(skip.includes(i)), onclick: () => { skip = skip.includes(i) ? skip.filter(x => x !== i) : [...skip, i]; drawDows(); preview(); } }, d)));
+      drawDows();
+      const pv = h('div', { class: 'diff small' });
+      const preview = () => {
+        const m = { ...n, total: Number(total.value) || 0, initDone: Number(init.value) || 0, start: st.value, end: en.value, skipDow: skip, unit: unit.value, totalMin: Math.round(Number(hrs.value) || 0), rounds: Math.max(1, Math.floor(Number(roundsIn.value) || 1)) };
+        if (!m.total || !m.start || !m.end || m.end < m.start) { pv.textContent = '全体の量と期間を入れると、1日の量を計算します。'; return; }
+        const pl = plan(m, m.start > today() ? m.start : today());
+        const qs = pl.days.filter(x => x.w > 0).map(x => x.q);
+        const typical = qs.length ? Math.round(qs.reduce((a, b) => a + b, 0) / qs.length) : 0;
+        pv.replaceChildren(h('div', null, '作業する日：', h('b', { class: 'num' }, pl.workDays), '日（休み ', h('span', { class: 'num' }, pl.days.filter(x => x.off).length), '日）'),
+          h('div', null, '1日あたり：約 ', h('b', { class: 'num', style: 'font-size:18px' }, typical), ` ${m.unit}`),
+          m.totalMin ? h('div', null, '1日の時間：約 ', h('b', { class: 'num' }, fmtMin(typical * m.totalMin / m.total)), `（1${m.unit}あたり ${+(m.totalMin / m.total).toFixed(1)}分）`) : null);
+      };
+      [unit, total, init, st, en, hrs, roundsIn].forEach(i => i.addEventListener('input', preview));
+      let endRef = n.endRef || null;
+      const endLink = dateLink(en, endRef, shared, r => endRef = r);
+      preview();
+      out.push(h('datalist', { id: 'units' }, ['語', 'ページ', '問', '回', '章', '分'].map(u => h('option', { value: u }))),
+        h('div', { class: 'two' }, field('1周の量', total), field('単位', unit)),
+        field('何周するか', roundsIn, '2以上にすると、全部の周を期間内に割り振ります。1周目が終わると自動で次の周になります'),
+        h('div', { class: 'two' }, field('開始日', st), field('終了日（ここまでに終える）', en)),
+        h('div', { class: 'two' },
+          h('button', { class: 'btn small', type: 'button', onclick: () => { if (!en.value) return toast('先に終了日を入れてください'); st.value = en.value; preview(); } }, '開始日を終了日と同じ日に'),
+          h('button', { class: 'btn small', type: 'button', onclick: () => { if (!st.value) return toast('先に開始日を入れてください'); en.value = st.value; endLink.setRef(null); preview(); } }, '終了日を開始日と同じ日に')), endLink.el,
+        h('div', { class: 'two' }, field('もう終わっている量', init), field('1周にかかる時間（分）', hrs)),
+        h('div', { class: 'field' }, h('span', null, '休む曜日（タップで切り替え）'), dows),
+        pv,
+        h('p', { class: 'hint', style: 'margin:0' }, 'できなかった日の分は、残りの日に自動で振り分け直します。設定の「休みの期間」も反映されます。'));
+      get = () => ({ unit: unit.value.trim(), total: Number(total.value) || 0, initDone: Number(init.value) || 0, start: st.value, end: en.value, endRef, skipDow: skip, log: n.log || {}, totalMin: Math.round(Number(hrs.value) || 0), rounds: Math.max(1, Math.floor(Number(roundsIn.value) || 1)) });
+    }
+    // 保存。新しく作るときは「追加」ボタンで（auto=false）、すでにある項目は変更するたびに自動で（auto=true）
+    const status = h('span', { class: 'hint grow', 'aria-live': 'polite' }, '変更すると自動で保存されます');
+    let deleted = false;
+    const commit = (auto) => {
+      if (deleted || (!isNew && (!state.nodes[n.id] || state.nodes[n.id].type !== type))) return; // 削除や種類の入れ替えのあとは保存しない
+      const fail = msg => { if (auto) status.textContent = '保存できません：' + msg; else toast(msg); };
+      const t = title.value.trim(); if (!t) return fail('名前を入れてください');
+      if (!places.size) return fail('場所を1つ以上選んでください');
+      const plist = [...places], primary = plist.includes(n.parent || '') ? (n.parent || '') : plist[0];
+      newParent = primary || null;
+      const copyTo = plist.filter(x => x !== primary).map(x => x || null);
+      const extra = get();
+      if (type === 'material' && (!extra.total || !extra.start || !extra.end || extra.end < extra.start)) return fail('全体の量と、開始日・終了日を正しく入れてください');
+      const doc = { ...n, id: n.id || uid('n'), kind: 'node', type, parent: newParent, title: t, created: n.created || Date.now(), ...extra };
+      if (!isNew && newParent !== (n.parent || null)) {
+        doc.order = Date.now(); // 移した先ではいちばん下
+        const oldRoot = rootId(n.id), newRoot = newParent ? rootId(newParent) : doc.id;
+        if (oldRoot !== newRoot) { // 別の大きな目標へ移したら、共通の期限との連動は外す
+          for (const [rf] of REF_FIELDS) doc[rf] = null;
+          for (const id of descendants(n.id)) { const x = state.nodes[id], part = {}; for (const [rf] of REF_FIELDS) if (x[rf]) part[rf] = null; if (Object.keys(part).length) store.patch(id, part); }
+        }
+      }
+      if (doc.parent) expanded.add(doc.parent); // 作った目標が見えるように親は開く。作った目標そのものは閉じたまま
+      if (type === 'goal') autoShare(doc, 'deadline', 'deadlineRef');
+      else if (type === 'material') autoShare(doc, 'end', 'endRef');
+      if (isRoot && !doc.parent) propagateDeadlines(doc);
+      saveOpen(); store.put(doc); if (!auto) close();
+      pruneAutoDeadlines(rootId(doc.id));
+      copyTo.forEach(pid => { copySubtree(state.nodes[doc.id], pid); if (pid) expanded.add(pid); });
+      if (copyTo.length) { saveOpen(); render(); toast(`${copyTo.length + 1}か所に入れました（コピー ${copyTo.length}つ）`); }
+      if (auto) {
+        n = state.nodes[doc.id]; // 次の自動保存は、保存したあとの内容をもとにする
+        places.clear(); places.add(n.parent || ''); syncPlaces();
+        status.textContent = '保存しました';
+      }
+    };
+    const row = h('div', { class: 'btns', style: 'align-items:center' });
+    if (isNew) row.append(h('button', { class: 'btn primary', onclick: () => commit(false) }, '追加'));
+    else row.append(status, deleteButton(type === 'goal' ? 'この目標と下を全部削除' : '削除', () => { deleted = true; [...descendants(n.id), n.id].forEach(id => store.remove(id)); close(); toast('削除しました'); }));
+    if (!isNew && type === 'material' && lapInfo(n).finished) {
+      const r = roundsOf(n), span = Math.max(7, diffDays(n.start, n.end) / r);
+      out.push(h('div', { class: 'diff small' }, h('div', { class: 'title' }, `${r > 1 ? r + '周' : '1周'}が終わりました`),
+        h('div', null, h('button', { class: 'btn primary small', type: 'button', onclick: () => {
+          const end = n.end > addDays(today(), 6) ? n.end : addDays(today(), Math.round(span));
+          store.patch(n.id, end !== n.end ? { rounds: r + 1, end, endRef: null } : { rounds: r + 1 });
+          close(); toast(`${r + 1}周目を追加しました（〜${md(end)}）`);
+        } }, `もう1周する（${r + 1}周目）`)),
+        h('div', { class: 'muted' }, '終了日が過ぎているときは、1周ぶんの日数だけ延ばします。後からこの画面で変えられます。')));
+    }
+    if (!isNew && type === 'material') out.push(h('button', { class: 'btn', type: 'button', onclick: () => { close(); openLog(n); } }, '記録と予定表を見る'));
+    if (!isNew) out.push(convertRow(n, close, true, () => commit(true))); // 変える前に、編集中の内容を保存
+    out.push(row);
+    if (isNew) return out;
+    return [autoSaveBox(out, () => commit(true), status)];
+  });
+}
+// 編集画面の入力をまとめて見張り、手を止めて少したったら自動で保存する
+function autoSaveBox(children, save, status) {
+  let timer = null;
+  const schedule = () => { clearTimeout(timer); status.textContent = '保存中…'; timer = setTimeout(save, 700); };
+  const box = h('div', { class: 'stack', style: 'gap:14px' }, children);
+  // 共通の期限のボタンなどが出す（外へ伝わらない）入力も拾えるように、捕まえる段階で受け取る
+  box.addEventListener('input', schedule, true);
+  box.addEventListener('change', schedule, true);
+  box.addEventListener('click', e => { if (e.target.closest('.dows button, .two > button, .seg button, .chip, .dlrow button')) schedule(); }, true);
+  return box;
+}
+
+// --- 科目をまとめて追加（定期試験など） ---
+const SUBJECT_PRESETS = ['電気回路', '電磁気学', '電子回路', 'ディジタル回路', '応用数学', '応用物理', 'プログラミング', '英語', '国語', '社会'];
+function openBulk(parent) {
+  ensureShared(rootId(parent.id));
+  openSheet('科目をまとめて追加', (close) => {
+    const ta = h('textarea', { id: 'bulk-names', rows: '7', style: 'min-height:150px', placeholder: '1行に1科目\n例：\n電気回路\n電磁気学\n応用数学' });
+    const lines = () => [...new Set(ta.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
+    const existing = new Set(kids(parent.id).map(k => k.title));
+    const last = state.settings.lastSubjects || [];
+    const chipsBox = h('div', { class: 'chips' });
+    const go = h('button', { class: 'btn primary', type: 'button' });
+    const draw = () => {
+      const cur = new Set(lines());
+      chipsBox.replaceChildren(...[...new Set([...last, ...SUBJECT_PRESETS])].map(s => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(cur.has(s)),
+        onclick: () => { const ls = lines(); ta.value = (cur.has(s) ? ls.filter(x => x !== s) : [...ls, s]).join('\n'); draw(); } }, s)));
+      const add = lines().filter(s => !existing.has(s));
+      go.textContent = add.length ? `${add.length}科目を追加` : '追加する科目を入れてください';
+      go.disabled = !add.length;
+    };
+    ta.addEventListener('input', draw);
+    const dl = h('input', { id: 'bulk-deadline', type: 'date' });
+    let dlRef = null;
+    const link = dateLink(dl, null, () => state.nodes[rootId(parent.id)]?.deadlines || [], r => { dlRef = r; });
+    go.addEventListener('click', () => {
+      const all = lines(), add = all.filter(s => !existing.has(s)); if (!add.length) return;
+      const now = Date.now();
+      if (dl.value && !dlRef) { // まとめて作る科目の期限も、共通の期限に自動で追加
+        const root = state.nodes[rootId(parent.id)];
+        if (root) { const { ref, list } = shareDate(root, dl.value, parent.title); if (list) store.patch(root.id, { deadlines: list }); dlRef = ref; }
+      }
+      add.forEach((title, i) => store.put({ id: uid('n'), kind: 'node', type: 'goal', parent: parent.id, title, start: today(), deadline: dl.value || null, deadlineRef: dlRef, done: false, created: now + i }));
+      saveSettings({ lastSubjects: all });
+      expanded.add(parent.id); saveOpen(); close();
+      const skipped = all.length - add.length;
+      toast(`${add.length}科目を追加しました` + (skipped ? `（すでにある${skipped}科目は飛ばしました）` : ''));
+    });
+    draw();
+    return [
+      h('div', { class: 'crumb' }, `「${parent.title}」の下に、科目ごとの小さい目標を作ります`),
+      field('科目（1行に1つ）', ta),
+      h('div', { class: 'field' }, h('span', null, last.length ? 'タップで入れる（前回の科目と、よくある科目）' : 'タップで入れる（よくある科目）'), chipsBox),
+      last.length ? h('div', null, h('button', { class: 'btn small', type: 'button', onclick: () => { ta.value = [...new Set([...lines(), ...last])].join('\n'); draw(); } }, `前回の科目（${last.length}つ）をすべて入れる`)) : null,
+      h('div', { class: 'stack', style: 'gap:6px' }, field('期限（全部の科目に同じ期限・なくてもOK）', dl), link.el),
+      existing.size ? h('p', { class: 'hint', style: 'margin:0' }, 'すでに同じ名前の目標がある科目は、飛ばして追加しません。') : null,
+      h('div', { class: 'btns' }, go),
+    ];
+  });
+}
+
+// --- 教材の記録 ---
+const LOG_RANGES = { w1: ['1週間', 7], m1: ['1か月', 30] };
+let logRange = (() => { try { return LOG_RANGES[localStorage.getItem('log-range')] ? localStorage.getItem('log-range') : 'w1'; } catch { return 'w1'; } })();
+function openLog(m) {
+  openSheet(m.title, (close) => {
+    const pl = plan(m);
+    const date = h('input', { id: 'log-date', type: 'date', value: today(), max: today() });
+    const amt = h('input', { id: 'log-amt', type: 'number', inputmode: 'numeric', min: '0', value: (m.log || {})[today()] ?? '' });
+    date.addEventListener('change', () => { amt.value = (m.log || {})[date.value] ?? ''; });
+    const u = m.unit || '', log = { ...(m.log || {}) };
+    // 1週間 / 1か月 の切り替え：これまでの記録とこれからの予定を、選んだ日数でまとめて見る
+    const tables = h('div', { style: 'display:flex;flex-direction:column;gap:14px;flex-shrink:0' });
+    const tbl = (head, rows, empty) => h('div', { class: 'tbl-wrap' }, h('table', null, h('thead', null, h('tr', null, h('th', null, '日付'), h('th', null, head))),
+      h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: '2' }, empty)))));
+    const fillTables = () => {
+      const N = LOG_RANGES[logRange][1], past = [], t = today();
+      const days = [...Array(N)].map((_, i) => addDays(t, i - N + 1));
+      const total = () => days.reduce((s, d) => s + (Number(log[d]) || 0), 0);
+      const pastHead = h('h2', null);
+      const setHead = () => { pastHead.textContent = `これまでの記録（${LOG_RANGES[logRange][0]}・合計 ${total()}${u}）`; };
+      setHead();
+      // 表の中の欄に数字を入れると、その日の記録としてそのまま保存する
+      for (const d of days) {
+        const inp = h('input', { type: 'number', inputmode: 'numeric', min: '0', class: 'log-cell', value: log[d] ?? '', placeholder: isOff(m, d) ? '休み' : '—', 'aria-label': `${mdw(d)}のやった量` });
+        inp.addEventListener('change', () => {
+          const v = inp.value === '' ? 0 : Math.max(0, Number(inp.value) || 0);
+          log[d] = v; store.patch(m.id, { log: { [d]: v } }); setHead();
+          if (d === date.value) amt.value = v || '';
+          toast(`${md(d)} を${v}${u}で記録しました`);
+        });
+        past.push(h('tr', null, h('td', null, mdw(d) + (d === t ? '・今日' : '')), h('td', { class: 'num' }, h('span', { class: 'log-in' }, inp, u))));
+      }
+      const fut = pl.days.slice(0, N), fsum = fut.reduce((s, x) => s + (x.q || 0), 0);
+      tables.replaceChildren(
+        h('div', { class: 'section' }, pastHead,
+          tbl('やった量', past.reverse(), ''), h('p', { class: 'hint', style: 'margin:0' }, '欄に数字を入れると、その日の記録としてそのまま保存されます（空にすると0）')),
+        h('div', { class: 'section' }, h('h2', null, `これからの予定（${LOG_RANGES[logRange][0]}・合計 ${fsum}${u}）`),
+          tbl('量', fut.map(x => h('tr', null, h('td', null, mdw(x.d)), h('td', { class: 'num' + (x.w ? '' : ' off') }, x.off ? '休み' : x.q + u))), '予定はありません'),
+          h('p', { class: 'hint', style: 'margin:0' }, '記録に合わせて自動で変わります')));
+    };
+    const rangeSeg = h('div', { class: 'seg', role: 'group', 'aria-label': '記録を見る期間', style: 'flex-shrink:0' },
+      Object.entries(LOG_RANGES).map(([k, [l]]) => h('button', { type: 'button', 'aria-pressed': String(logRange === k), onclick: e => {
+        logRange = k; try { localStorage.setItem('log-range', k); } catch {}
+        e.currentTarget.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); fillTables(); } }, l)));
+    fillTables();
+    return [
+      h('div', { class: 'crumb' }, path(m.id)),
+      h('div', { class: 'diff' }, h('div', null, '進み具合：', h('b', { class: 'num' }, lapText(m)), roundsOf(m) > 1 ? h('span', { class: 'muted' }, `（${roundsOf(m)}周のうち、全体 ${doneTotal(m)}/${grand(m)}${m.unit || ''}）`) : null), bar(progress(m.id))),
+      h('div', { class: 'two' }, field('日付', date), field(`やった量（${m.unit || ''}）`, amt)),
+      h('div', { class: 'btns' },
+        h('button', { class: 'btn primary', onclick: () => { const v = Math.max(0, Number(amt.value) || 0); log[date.value || today()] = v; store.patch(m.id, { log: { [date.value || today()]: v } }); close(); toast('記録しました'); } }, '記録する'),
+        date.value === today() && pl.todayQ ? h('button', { class: 'btn', onclick: () => { amt.value = pl.todayQ; } }, `今日のノルマ（${pl.todayQ}）を入れる`) : null),
+      rangeSeg, tables,
+      h('button', { class: 'btn ghost', onclick: () => { close(); openNode(m); } }, '教材の設定を変える'),
+      convertRow(m, close),
+    ];
+  });
+}
+
+// --- 課題の追加・編集 ---
+function openAsg(a) {
+  const isNew = !a;
+  a = a || { progress: 0, start: today(), due: addDays(today(), 7) };
+  openSheet(isNew ? '課題を追加' : '課題を編集', (close) => {
+    const title = h('input', { id: 'a-title', value: a.title || '', placeholder: '例：電気回路 レポート' });
+    const subject = h('input', { id: 'a-subject', value: a.subject || '', placeholder: '例：電気回路Ⅱ' });
+    const st = h('input', { id: 'a-start', type: 'date', value: a.start });
+    const due = h('input', { id: 'a-due', type: 'date', value: a.due });
+    const memo = h('textarea', { id: 'a-memo', placeholder: '提出方法、ページ数など' }, a.memo || '');
+    const ahrs = h('input', { id: 'a-hours', type: 'number', inputmode: 'numeric', min: '0', step: '5', value: a.estMin || '', placeholder: '例：180' });
+    let progress = Math.min(100, Math.max(0, Number(a.progress) || 0));
+    const form = [
+      field('課題名', title), field('科目（なくてもOK）', subject),
+      h('div', { class: 'two' }, field('取りかかる日', st), field('〆切', due)),
+      progressField(progress, v => progress = v),
+      field('かかる時間の見込み（分・なくてもOK）', ahrs, '残りの時間（見込み × まだの割合）を、〆切まで毎日同じだけ割り振って予測します'),
+      field('メモ', memo),
+    ];
+    const status = h('span', { class: 'hint grow', 'aria-live': 'polite' }, '変更すると自動で保存されます');
+    let deleted = false;
+    const commit = (auto) => {
+      if (deleted || (!isNew && !state.asgs[a.id])) return;
+      const fail = msg => { if (auto) status.textContent = '保存できません：' + msg; else toast(msg); };
+      const t = title.value.trim(); if (!t) return fail('課題名を入れてください');
+      if (!st.value || !due.value || due.value < st.value) return fail('取りかかる日と〆切を正しく入れてください');
+      const { weight, ...rest } = a; // 以前の「重さ」は使わない
+      const doc = { ...rest, id: a.id || uid('a'), kind: 'asg', title: t, subject: subject.value.trim(), start: st.value, due: due.value, progress, estMin: Math.round(Number(ahrs.value) || 0), memo: memo.value, done: !!a.done, created: a.created || Date.now() };
+      if (!isNew && progress !== (Number(a.progress) || 0)) doc.progToday = a.progToday?.date === today() ? a.progToday : { date: today(), from: asgProg(a) };
+      store.put(doc);
+      if (auto) { a = state.asgs[doc.id]; status.textContent = '保存しました'; }
+      else { close(); toast('課題を追加しました'); }
+    };
+    const buttons = h('div', { class: 'btns', style: 'align-items:center' });
+    if (isNew) { buttons.append(h('button', { class: 'btn primary', onclick: () => commit(false) }, '追加')); return [...form, buttons]; }
+    buttons.append(status, deleteButton('削除', () => { deleted = true; store.remove(a.id); close(); toast('削除しました'); }));
+    return [autoSaveBox([...form, buttons], () => commit(true), status)];
+  });
+}
+// ---------- 例のデータ ----------
+function loadSample() {
+  const t = today(), now = Date.now();
+  const g1 = 'n-sample-toeic', g2 = 'n-sample-kosen';
+  const y = parse(t).getMonth() >= 3 ? parse(t).getFullYear() + 1 : parse(t).getFullYear();
+  const docs = [
+    { id: g1, kind: 'node', type: 'goal', parent: null, title: '3月までにTOEIC 800点', deadline: `${y}-03-15`, deadlineRef: 'dl-sample-exam', deadlines: [{ id: 'dl-sample-exam', label: 'TOEIC本番', date: `${y}-03-15` }, { id: 'dl-sample-mock', label: '模試', date: addDays(t, 7) }], created: now },
+    { id: 'n-sample-word', kind: 'node', type: 'material', parent: g1, title: '金のフレーズを1周', unit: '語', total: 1000, totalMin: 1200, initDone: 0, start: t, end: addDays(t, 39), skipDow: [], log: {}, created: now + 1 },
+    { id: 'n-sample-p5', kind: 'node', type: 'material', parent: g1, title: '公式問題集 Part5', unit: '問', total: 300, totalMin: 900, initDone: 0, start: t, end: addDays(t, 69), skipDow: [0], log: {}, created: now + 2 },
+    { id: 'n-sample-mock', kind: 'node', type: 'task', parent: g1, title: '模試を1回通しで解く', date: addDays(t, 7), dateRef: 'dl-sample-mock', estMin: 120, done: false, created: now + 3 },
+    { id: g2, kind: 'node', type: 'goal', parent: null, title: '後期の電気回路でA評価', created: now + 4 },
+    { id: 'n-sample-rev', kind: 'node', type: 'task', parent: g2, title: '前回の小テストを解き直す', date: t, estMin: 30, done: false, created: now + 5 },
+    { id: 'a-sample-rep', kind: 'asg', title: '電気回路 レポート（RLC回路）', subject: '電気回路Ⅱ', start: addDays(t, 2), due: addDays(t, 5), progress: 30, estMin: 180, memo: '', done: false, created: now + 6 },
+  ];
+  expanded.add(g1); expanded.add(g2); saveOpen();
+  docs.forEach(d => store.put(d));
+  toast('例を読み込みました。不要になったら目標ごと削除できます');
+}
+
+render();
+initStore();
+setInterval(() => { if (!document.querySelector('.scrim')) render(); }, 60000);
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
