@@ -1,6 +1,6 @@
 // オフラインでも開けるように、アプリの画面とアイコンを端末に残しておく
 // アプリを直したときは VERSION を変えると、新しいファイルに入れ替わる
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'goal-tree-' + VERSION;
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 

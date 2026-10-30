@@ -557,19 +557,43 @@ async function initStore() {
     setSync(false, 'この端末だけに保存（同期につながりません）');
   }
 }
-// ログイン画面（Firebase の Authentication で作ったアカウント）
+// ログイン画面。「新規登録」で自分でアカウントを作れる。パスワードを忘れたら再設定メールを送る
+let loginMode = 'login';
 function loginView() {
+  const isNew = loginMode === 'signup';
   const mail = h('input', { id: 'login-mail', type: 'email', autocomplete: 'username', inputmode: 'email', placeholder: 'メールアドレス' });
-  const pass = h('input', { id: 'login-pass', type: 'password', autocomplete: 'current-password', placeholder: 'パスワード' });
+  const pass = h('input', { id: 'login-pass', type: 'password', autocomplete: isNew ? 'new-password' : 'current-password', placeholder: isNew ? '6文字以上' : 'パスワード' });
+  const pass2 = isNew ? h('input', { id: 'login-pass2', type: 'password', autocomplete: 'new-password', placeholder: 'もう一度' }) : null;
   const err = h('p', { class: 'small err', style: 'margin:0', 'aria-live': 'polite' });
-  const btn = h('button', { class: 'btn primary', type: 'submit' }, 'ログイン');
-  const MSG = { 'auth/invalid-credential': 'メールアドレスかパスワードが違います', 'auth/invalid-email': 'メールアドレスの形が正しくありません', 'auth/too-many-requests': '何度も失敗したので、少し待ってからもう一度試してください', 'auth/network-request-failed': 'インターネットにつながっていません' };
+  const btn = h('button', { class: 'btn primary', type: 'submit' }, isNew ? '登録して始める' : 'ログイン');
+  const MSG = { 'auth/invalid-credential': 'メールアドレスかパスワードが違います', 'auth/invalid-email': 'メールアドレスの形が正しくありません', 'auth/missing-email': 'メールアドレスを入れてください',
+    'auth/too-many-requests': '何度も失敗したので、少し待ってからもう一度試してください', 'auth/network-request-failed': 'インターネットにつながっていません',
+    'auth/email-already-in-use': 'このメールアドレスはもう登録されています。「ログイン」から入ってください', 'auth/weak-password': 'パスワードは6文字以上にしてください',
+    'auth/missing-password': 'パスワードを入れてください', 'auth/admin-restricted-operation': '今は新しい登録ができない設定になっています' };
+  const say = x => { err.textContent = MSG[x.code] || '（' + (x.code || x.message) + '）うまくいきませんでした'; };
+  const swap = to => () => { loginMode = to; render(); };
+  const forgot = h('button', { class: 'btn small ghost', type: 'button', onclick: async () => {
+    if (!mail.value.trim()) { err.textContent = '先にメールアドレスを入れてください'; mail.focus(); return; }
+    try { await fb.A.sendPasswordResetEmail(fb.auth, mail.value.trim()); err.textContent = ''; toast('パスワードを決め直すメールを送りました。届いたメールのリンクから変えてください'); }
+    catch (x) { say(x); }
+  } }, 'パスワードを忘れた');
   const form = h('form', { class: 'card stack login', onsubmit: async e => {
-    e.preventDefault(); err.textContent = ''; btn.disabled = true;
-    try { await fb.A.signInWithEmailAndPassword(fb.auth, mail.value.trim(), pass.value); }
-    catch (x) { err.textContent = MSG[x.code] || 'ログインできませんでした（' + (x.code || x.message) + '）'; btn.disabled = false; }
-  } }, h('div', { class: 'title' }, 'ログイン'), h('p', { class: 'small muted', style: 'margin:0' }, '同じアカウントでログインすると、iPhone と iPad で同じデータが見られます。'),
-    field('メールアドレス', mail), field('パスワード', pass), err, h('div', { class: 'btns' }, btn));
+    e.preventDefault(); err.textContent = '';
+    if (isNew && pass.value !== pass2.value) { err.textContent = '2つのパスワードが同じではありません'; return; }
+    btn.disabled = true;
+    try {
+      if (isNew) { await fb.A.createUserWithEmailAndPassword(fb.auth, mail.value.trim(), pass.value); loginMode = 'login'; toast('登録しました'); }
+      else await fb.A.signInWithEmailAndPassword(fb.auth, mail.value.trim(), pass.value);
+    } catch (x) { say(x); btn.disabled = false; }
+  } },
+    h('div', { class: 'seg', role: 'group', 'aria-label': 'ログインか新規登録か' },
+      h('button', { type: 'button', 'aria-pressed': String(!isNew), onclick: swap('login') }, 'ログイン'),
+      h('button', { type: 'button', 'aria-pressed': String(isNew), onclick: swap('signup') }, '新規登録')),
+    h('p', { class: 'small muted', style: 'margin:0' }, isNew
+      ? 'メールアドレスとパスワードを決めて登録します。データは人ごとに別々で、ほかの人からは見えません。'
+      : '同じアカウントでログインすると、iPhone と iPad で同じデータが見られます。'),
+    field('メールアドレス', mail), field(isNew ? 'パスワード（6文字以上）' : 'パスワード', pass), isNew ? field('パスワード（確認）', pass2) : null, err,
+    h('div', { class: 'btns' }, btn, isNew ? null : forgot));
   return form;
 }
 
